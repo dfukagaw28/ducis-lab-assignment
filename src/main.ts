@@ -1,22 +1,42 @@
 /**
- * M1: ドメイン層を合成データで動かす画面。
+ * 画面の配線。
  *
- * 入力はまだ src/dev/sampleInstance.ts の合成データで、M2 でドラッグ＆ドロップ
- * した実ファイルに置き換える。抽選シードだけは本番と同じ扱いで、読み込み時に
- * ランダムな既定値を入れ、結果と一緒に表示する。
+ * 入力ファイル → インスタンス → 配属 → 表示と CSV 出力。
+ * 実ファイルのパーサはまだ無いので、読むのは暫定の CSV (src/io/parsers.ts)。
+ * 合成データでも試せるように「サンプルを読み込む」を置いてある。
  */
 
 import { buildReport, type Report } from "./domain/report.js";
 import { assign } from "./domain/solve.js";
-import { defaultParams, randomSeed, type Instance, type Params } from "./domain/types.js";
+import {
+  defaultParams,
+  randomSeed,
+  type Instance,
+  type MissingScorePolicy,
+  type Params,
+} from "./domain/types.js";
 import { sampleInstance } from "./dev/sampleInstance.js";
+import { downloadCsv, labsCsv, outputFileName, studentsCsv, summaryCsv } from "./io/export.js";
+import { buildInstance } from "./io/intake.js";
+import { createDropZone, message } from "./ui/dropzone.js";
+import { renderMessages, renderReport } from "./ui/render.js";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) throw new Error("#app is missing from index.html");
 
 app.innerHTML = `
-  <form id="controls" class="panel">
-    <h2>パラメータ</h2>
+  <section class="panel">
+    <h2>1. 入力ファイル</h2>
+    <div id="intake"></div>
+    <p class="hint">
+      希望順位・GPA・研究室（定員）・教員裁量点の 4 種類。裁量点は研究室ごとに
+      分かれていて構いません。形式は README を参照してください。
+    </p>
+    <button type="button" id="useSample">サンプルデータを読み込む</button>
+  </section>
+
+  <form class="panel" id="controls">
+    <h2>2. パラメータ</h2>
     <div class="row">
       <label>抽選シード <span class="hint">同点処理に使う</span>
         <input id="seed" type="number" min="0" step="1" required />
@@ -25,131 +45,110 @@ app.innerHTML = `
     </div>
     <div class="row">
       <label>GPA 配点 <input id="gpaWeight" type="number" min="0" max="100" step="1" /></label>
-      <label>裁量点 配点 <input id="discWeight" type="number" min="0" max="100" step="1" /></label>
       <label>GPA の満点 <input id="gpaMax" type="number" min="0.1" step="0.1" /></label>
+      <label>裁量点 配点 <input id="discWeight" type="number" min="0" max="100" step="1" /></label>
+      <label>裁量点の満点 <input id="discMax" type="number" min="0.1" step="0.1" /></label>
     </div>
     <div class="row">
-      <label>学生数 <input id="numStudents" type="number" min="1" max="2000" value="150" /></label>
-      <label>研究室数 <input id="numLabs" type="number" min="1" max="200" value="10" /></label>
+      <label>裁量点が無い学生
+        <select id="missingScore">
+          <option value="zero">0 点として扱う</option>
+          <option value="unacceptable">受け入れ不可にする</option>
+        </select>
+      </label>
     </div>
     <button type="submit" class="primary">配属を計算する</button>
+    <p id="error" class="error" hidden></p>
   </form>
+
+  <p id="warnings" class="warnings" hidden></p>
   <section id="output"></section>
 `;
 
-const form = app.querySelector<HTMLFormElement>("#controls")!;
 const field = (id: string) => app.querySelector<HTMLInputElement>(`#${id}`)!;
+const missingScoreField = app.querySelector<HTMLSelectElement>("#missingScore")!;
+const errorBox = app.querySelector<HTMLElement>("#error")!;
+const warningBox = app.querySelector<HTMLElement>("#warnings")!;
+const output = app.querySelector<HTMLElement>("#output")!;
 
 // ページを開くたびに新しいシードを引く
 field("seed").value = String(randomSeed());
 field("gpaWeight").value = String(defaultParams.gpaWeight);
-field("discWeight").value = String(defaultParams.discretionaryWeight);
 field("gpaMax").value = String(defaultParams.gpaMax);
+field("discWeight").value = String(defaultParams.discretionaryWeight);
+field("discMax").value = String(defaultParams.discretionaryMax);
 
-app.querySelector<HTMLButtonElement>("#reseed")!.addEventListener("click", () => {
-  field("seed").value = String(randomSeed());
+const dropZone = createDropZone(app.querySelector<HTMLElement>("#intake")!);
+
+/** 直近の結果。ダウンロードのために持っておく。 */
+let latest: { instance: Instance; report: Report; params: Params } | null = null;
+/** サンプルを使っているときだけ入る。ファイルを入れれば消える。 */
+let sample: Instance | null = null;
+
+dropZone.onChange(() => {
+  sample = null;
+});
+
+app.querySelector<HTMLButtonElement>("#useSample")!.addEventListener("click", () => {
+  sample = sampleInstance({ numStudents: 150, numLabs: 10, seed: 4242 });
   run();
 });
 
-form.addEventListener("submit", (event) => {
+app.querySelector<HTMLButtonElement>("#reseed")!.addEventListener("click", () => {
+  field("seed").value = String(randomSeed());
+  if (latest !== null) run();
+});
+
+app.querySelector<HTMLFormElement>("#controls")!.addEventListener("submit", (event) => {
   event.preventDefault();
   run();
 });
 
-function run(): void {
-  const seed = Number(field("seed").value);
-  const params: Params = {
-    ...defaultParams,
-    seed,
+output.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-download]");
+  if (button === null || latest === null) return;
+  const { instance, report, params } = latest;
+  const kind = button.dataset["download"]!;
+  const csv =
+    kind === "students"
+      ? studentsCsv(instance, report)
+      : kind === "labs"
+        ? labsCsv(instance, report)
+        : summaryCsv(report, params);
+  downloadCsv(outputFileName(kind, params.seed), csv);
+});
+
+function readParams(): Params {
+  return {
+    seed: Number(field("seed").value),
     gpaWeight: Number(field("gpaWeight").value),
-    discretionaryWeight: Number(field("discWeight").value),
     gpaMax: Number(field("gpaMax").value),
+    discretionaryWeight: Number(field("discWeight").value),
+    discretionaryMax: Number(field("discMax").value),
+    missingScore: missingScoreField.value as MissingScorePolicy,
   };
-
-  // 合成データも同じシードから作るので、シードを変えると名簿ごと変わる。
-  // 実データに差し替わればインスタンスはシードに依存しなくなる。
-  const instance = sampleInstance({
-    numStudents: Number(field("numStudents").value),
-    numLabs: Number(field("numLabs").value),
-    seed,
-  });
-
-  render(instance, buildReport(instance, assign(instance, params)));
 }
 
-function render(instance: Instance, report: Report): void {
-  const { summary } = report;
-  const labName = new Map(instance.labs.map((lab) => [lab.id, lab.name ?? lab.id]));
+function run(): void {
+  errorBox.hidden = true;
+  try {
+    const files = dropZone.files();
+    if (files.length === 0 && sample === null) {
+      throw new Error("入力ファイルを読み込むか、サンプルデータを使ってください");
+    }
 
-  const distribution = summary.choiceCounts
-    .map((count, index) =>
-      count === 0
-        ? ""
-        : `<tr><td>第${index + 1}希望</td><td class="num">${count}</td>
-           <td class="num">${percent(count, summary.numStudents)}</td></tr>`
-    )
-    .join("");
+    const built = sample === null ? buildInstance(files) : { instance: sample, warnings: [] };
+    const params = readParams();
+    const report = buildReport(built.instance, assign(built.instance, params));
 
-  const studentRows = report.students
-    .map(
-      (row) => `<tr>
-        <td><code>${row.id}</code></td>
-        <td>${row.name ?? ""}</td>
-        <td class="num">${row.gpa.toFixed(2)}</td>
-        <td class="num">${row.lottery}</td>
-        <td${row.lab === null ? ' class="unmatched"' : ""}>${
-          row.lab === null ? "未配属" : labName.get(row.lab)
-        }</td>
-        <td class="num">${row.choice === null ? "-" : `第${row.choice}希望`}</td>
-        <td class="num">${row.total === null ? "-" : row.total.toFixed(1)}</td>
-      </tr>`
-    )
-    .join("");
-
-  const labRows = report.labs
-    .map(
-      (lab) => `<tr>
-        <td>${lab.name ?? lab.id}</td>
-        <td class="num">${lab.filled} / ${lab.capacity}</td>
-        <td>${lab.students.map((id) => `<code>${id}</code>`).join(" ")}</td>
-      </tr>`
-    )
-    .join("");
-
-  const stability =
-    summary.blockingPairs.length === 0
-      ? `<p class="ok">安定性の検査: ブロッキングペアはありません。</p>`
-      : `<p class="error">安定性の検査: ブロッキングペアが ${summary.blockingPairs.length} 件あります。</p>`;
-
-  app!.querySelector("#output")!.innerHTML = `
-    <h2>結果</h2>
-    <dl class="stats">
-      <div><dt>抽選シード</dt><dd><code>${summary.seed}</code></dd></div>
-      <div><dt>学生</dt><dd>${summary.numStudents} 人</dd></div>
-      <div><dt>研究室</dt><dd>${summary.numLabs} 室（定員計 ${summary.totalCapacity}）</dd></div>
-      <div><dt>配属</dt><dd>${summary.matched} 人</dd></div>
-      <div><dt>未配属</dt><dd>${summary.unmatched} 人</dd></div>
-    </dl>
-    ${stability}
-
-    <h3>希望順位の内訳</h3>
-    <table><thead><tr><th>希望</th><th class="num">人数</th><th class="num">割合</th></tr></thead>
-      <tbody>${distribution}</tbody></table>
-
-    <h3>研究室別</h3>
-    <table><thead><tr><th>研究室</th><th class="num">配属 / 定員</th><th>学生</th></tr></thead>
-      <tbody>${labRows}</tbody></table>
-
-    <h3>学生別</h3>
-    <table><thead><tr>
-      <th>学籍番号</th><th>氏名</th><th class="num">GPA</th><th class="num">抽選</th>
-      <th>配属先</th><th class="num">希望</th><th class="num">総合点</th>
-    </tr></thead><tbody>${studentRows}</tbody></table>
-  `;
+    latest = { instance: built.instance, report, params };
+    renderMessages(warningBox, built.warnings);
+    renderReport(output, built.instance, report);
+  } catch (cause) {
+    latest = null;
+    output.innerHTML = "";
+    warningBox.hidden = true;
+    errorBox.textContent = message(cause);
+    errorBox.hidden = false;
+  }
 }
-
-function percent(count: number, total: number): string {
-  return total === 0 ? "-" : `${((count / total) * 100).toFixed(1)}%`;
-}
-
-run();
