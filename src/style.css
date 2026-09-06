@@ -119,3 +119,51 @@ th.num {
 .error {
   color: color-mix(in srgb, red 70%, currentColor);
 }
+
+.drop {
+  padding: 2rem 1rem;
+  border: 2px dashed var(--border);
+  border-radius: 0.5rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop.over {
+  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.drop p {
+  margin: 0;
+}
+
+.files {
+  margin-top: 0.75rem;
+  width: auto;
+}
+
+.files td,
+.files th {
+  padding: 0.2rem 0.6rem;
+}
+
+select {
+  padding: 0.3rem 0.4rem;
+  font: inherit;
+}
+
+.warnings {
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, orange 50%, var(--border));
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, orange 8%, transparent);
+}
+
+.warnings ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+button.primary {
+  font-weight: 600;
+}
