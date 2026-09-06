@@ -25,7 +25,7 @@
 ## 3. データフロー
 
 ```
-[LMS 希望順位ファイル (.txt)] ─┐
+[eClass 希望順位ファイル (.txt)] ─┐
 [GPA ファイル (.xlsx)]        ─┼─→ パーサ層 ─→ 正規化データ ─┐
 [裁量点ファイル (.xlsx) × 研究室数] ─┘                      │
                                                             ↓
@@ -70,7 +70,7 @@ interface Instance {
 
 ### 暫定の入力形式（M2）
 
-実ファイル（LMS のテキストと Excel）のパーサができるまで、こちらで決めた CSV を
+実ファイル（eClass のテキストと Excel）のパーサができるまで、こちらで決めた CSV を
 読む。M3 のパーサも「テキスト → 中間の行」という同じ形で書き、`io/intake.ts` から
 差し替える。中間表現より手前だけが変わるので、ドメイン層は影響を受けない。
 
@@ -90,9 +90,9 @@ interface Instance {
 
 サンプルは `samples/` にある（匿名の合成データ）。
 
-### LMS の希望順位ファイル（M3）
+### eClass の希望順位ファイル（M3）
 
-LMS が書き出すテキスト。CSV だが、頭に見出しが付き、`[...]` で始まるブロックが
+eClass が書き出すテキスト。CSV だが、頭に見出しが付き、`[...]` で始まるブロックが
 空行で区切られて並ぶ。
 
 ```
@@ -114,7 +114,7 @@ LMS が書き出すテキスト。CSV だが、頭に見出しが付き、`[...]
 
 引用符の中に改行やカンマを含む欄（HTML のラベル）があるので、行に切ってから
 CSV にするのではなく、ファイル全体を CSV として読んでから行を数える
-（`io/lms.ts` の `splitSections`）。
+（`io/eclass.ts` の `splitSections`）。
 
 ## 5. スコアリング
 
@@ -189,7 +189,7 @@ src/
     solve.ts      stableMatch 呼び出し
     report.ts     集計・安定性検証
   io/
-    lmsPreferences.ts   LMS テキスト → 希望順位
+    eclass.ts           eClass テキスト → 希望順位
     gpaWorkbook.ts      Excel → GPA
     labWorkbook.ts      Excel → 裁量点
     export.ts           CSV / xlsx 出力
@@ -207,14 +207,14 @@ Vite の `resolve.alias` でスタブに逃がす（`examples/web/vite.config.ts
 - **M0** プロジェクト雛形（Vite + TypeScript + ライブラリ導入、node stub alias）
 - **M1** ドメイン層（スコア計算 → stableMatch → 集計）＋ 合成データによるユニットテスト
 - **M2** UI 骨組み（D&D、パラメータ、結果表示、CSV 出力）— 合成データで一本通す
-- **M3** 実ファイルのパーサ実装（LMS テキスト / GPA Excel / 裁量点 Excel）
+- **M3** 実ファイルのパーサ実装（eClass テキスト / GPA Excel / 裁量点 Excel）
 - **M4** Excel 出力、安定性検証、統計表示、GitHub Pages 公開
 
 M1・M2 は実ファイルの形式が未確定でも進められる。
 
 ## 10. 未確定事項
 
-1. LMS 希望順位ファイルの実際の形式（サンプルが必要）
+1. eClass 希望順位ファイルの列構成（`splitSections` まで実装済み、中身の読み取りが残り）
 2. GPA Excel / 裁量点 Excel の列構成（サンプルが必要）
 3. 定員はどのファイルから来るか（暫定で研究室 CSV。実ファイルの構成待ち）
 4. 裁量点ファイルに全学生が載るのか、希望者のみか

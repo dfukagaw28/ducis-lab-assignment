@@ -49,7 +49,7 @@ npm test
 - 文字コードは UTF-8 と Shift_JIS を自動で見分けます（Excel の CSV は多くが後者）
 - 書き出す CSV は Excel が文字化けしないよう BOM 付き UTF-8 です
 
-これは **LMS のテキストと Excel を直接読めるようになるまでの暫定形式**です
+これは **eClass のテキストと Excel を直接読めるようになるまでの暫定形式**です
 （[DESIGN.md](DESIGN.md) の M3）。
 
 ## パラメータ
@@ -91,5 +91,5 @@ npm test
 - [x] **M0** プロジェクト雛形（Vite + TypeScript + ライブラリ導入）
 - [x] **M1** ドメイン層（スコア計算 → `stableMatch` → 集計）とテスト
 - [x] **M2** UI 骨組み（ドラッグ＆ドロップ、パラメータ、結果表示、CSV 出力）
-- [ ] **M3** 実ファイルのパーサ（LMS テキスト / GPA Excel / 裁量点 Excel）
+- [ ] **M3** 実ファイルのパーサ（eClass テキスト / GPA Excel / 裁量点 Excel）
 - [ ] **M4** Excel 出力、安定性検証、統計表示、公開

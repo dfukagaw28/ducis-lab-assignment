@@ -49,8 +49,8 @@ export function buildInstance(files: readonly SourceFile[]): Built {
     return found[0]!;
   };
 
-  // TODO(M3): LMS のテキストなら parseLmsPreferences に振り分ける
-  // （io/lms.ts。中身の読み取りがまだ未実装なので、今は暫定 CSV だけ）
+  // TODO(M3): eClass のテキストなら parseEclassPreferences に振り分ける
+  // （io/eclass.ts。中身の読み取りがまだ未実装なので、今は暫定 CSV だけ）
   const preferenceRows = inFile(only("preferences"), parsePreferences);
   const gpa = inFile(only("gpa"), parseGpa);
   const labRows = inFile(only("labs"), parseLabs);
