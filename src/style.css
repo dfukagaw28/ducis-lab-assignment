@@ -46,3 +46,76 @@ td.unmatched {
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+.panel {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.panel h2 {
+  margin-top: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+}
+
+input {
+  padding: 0.3rem 0.4rem;
+  font: inherit;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.8em;
+}
+
+button {
+  padding: 0.35rem 0.9rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+.stats dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stats dd {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ok {
+  color: color-mix(in srgb, green 70%, currentColor);
+}
+
+.error {
+  color: color-mix(in srgb, red 70%, currentColor);
+}
