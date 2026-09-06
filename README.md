@@ -31,6 +31,18 @@ npm run typecheck
 npm test
 ```
 
+eClass のファイルの構造を覗くには:
+
+```bash
+npm run inspect -- data/eclass.txt          # 先頭 3 行ずつ
+npm run inspect -- data/eclass.txt --rows 10
+```
+
+ヘッダ・パラメータ・ブロックを列番号つきで並べます（選択肢ラベルは HTML タグを
+外したものも併記）。`splitSections` が通らなければ、その理由と先頭 30 行をそのまま
+出すので、`src/io/eclass.ts` の定数を直す手がかりになります。実データの中身を端末に
+出すので、既定では各ブロックの先頭 3 行だけです。
+
 ## 入力ファイル
 
 4 種類のファイルをドラッグ＆ドロップします。種類はファイル名から推測し、外れて
