@@ -91,6 +91,10 @@ export function splitSections(text: string): EclassSections {
 
     const title = titleOf(row);
     if (title !== null) {
+      const trailing = trailingCells(row);
+      if (trailing.length > 0) {
+        notes.push(`[${title}] の見出しの行に余分な欄があります: ${trailing.join(" | ")}`);
+      }
       current = { title, rows: [] };
       blocks.push(current);
     } else if (current !== null) {
@@ -101,6 +105,14 @@ export function splitSections(text: string): EclassSections {
   }
 
   if (blocks.length === 0) throw new Error("[...] のブロックが一つもありません");
+
+  // 見出しが繰り返されると findBlock は最初のものを返す。黙って落とさないよう伝える。
+  const counts = new Map<string, number>();
+  for (const block of blocks) counts.set(block.title, (counts.get(block.title) ?? 0) + 1);
+  for (const [title, count] of counts) {
+    if (count > 1) notes.push(`[${title}] のブロックが ${count} 個あります`);
+  }
+
   return { preamble, parameters, blocks, notes };
 }
 
@@ -166,12 +178,23 @@ function isBlank(row: readonly string[]): boolean {
   return row.every((cell) => cell.trim() === "");
 }
 
-/** `[ユーザ毎の回答リスト]` の行なら見出しを返す。そうでなければ null。 */
+/**
+ * `[ユーザ毎の回答リスト]` の行なら見出しを返す。そうでなければ null。
+ *
+ * 見た目は 1 列目だけで決める。かつて「他の列がすべて空であること」も求めて
+ * いたが、見出しの行に余分な欄が付いているファイルがあり、そこでブロックが
+ * 次のブロックとつながってしまった。角括弧で始まって角括弧で終わる欄が本文に
+ * 現れることは無いので、1 列目だけで足りる。余分な欄があれば notes で知らせる。
+ */
 function titleOf(row: readonly string[]): string | null {
   if (row.length === 0) return null;
   const match = /^\[(.+)\]$/.exec(row[0]!.trim());
-  // 見出しの行に他の欄があれば、それは見出しではない
-  return match === null || row.slice(1).some((cell) => cell.trim() !== "") ? null : match[1]!;
+  return match === null ? null : match[1]!;
+}
+
+/** 見出しの行に付いていた、1 列目より後ろの中身。 */
+function trailingCells(row: readonly string[]): string[] {
+  return row.slice(1).filter((cell) => cell.trim() !== "");
 }
 
 /** 空行を読み飛ばす。 */
