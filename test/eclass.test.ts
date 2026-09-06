@@ -68,12 +68,25 @@ describe("splitSections", () => {
     ]);
   });
 
-  it("ヘッダが足りなければ止まる", () => {
-    expect(() => splitSections("a\nb\n")).toThrow(/ヘッダ/);
+  it("説明どおりの形なら注意書きは出ない", () => {
+    expect(sections.notes).toEqual([]);
   });
 
-  it("空行が無ければどこで食い違ったか言う", () => {
-    expect(() => splitSections(fixture.replace("備考,---\n\n", "備考,---\n"))).toThrow(/空行/);
+  it("ヘッダの行数が違っても通し、notes に残す", () => {
+    const extra = splitSections(fixture.replace("備考,---\n", "備考,---\n追記,---\n"));
+    expect(extra.preamble).toHaveLength(6);
+    expect(extra.blocks).toHaveLength(5);
+    expect(extra.notes.join()).toMatch(/ヘッダが 6 行/);
+  });
+
+  it("ヘッダとパラメータの間に空行が無ければ、パラメータを見失ったと言う", () => {
+    expect(() => splitSections(fixture.replace("備考,---\n\n", "備考,---\n"))).toThrow(
+      /パラメータの行がありません/
+    );
+  });
+
+  it("パラメータもブロックも無ければ止まる", () => {
+    expect(() => splitSections("a\nb\n")).toThrow(/パラメータの行がありません/);
   });
 });
 

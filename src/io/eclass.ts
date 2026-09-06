@@ -1,7 +1,7 @@
 /**
- * e-class (LMS) が書き出す希望順位ファイルのパーサ。
+ * eClass (LMS) が書き出す希望順位ファイルのパーサ。
  *
- * ファイルの形は DESIGN.md の「e-class の希望順位ファイル」を参照。ここでは
+ * ファイルの形は DESIGN.md の「eClass の希望順位ファイル」を参照。ここでは
  * 構造を切り分けるところまでを用意してあり、中身の読み取り
  * (`parseOptionLabels` と `parseUserAnswers`) はこれから書く。
  *
@@ -12,10 +12,10 @@
 import { parseCsv } from "./csv.js";
 import type { PreferenceRow } from "./parsers.js";
 
-/** 冒頭の、教材名や出力日時が書かれた行数。使わない。 */
+/** 冒頭の、教材名や出力日時が書かれた行数。数えるのは空行までなので、目安。 */
 const PREAMBLE_ROWS = 5;
 
-/** 問題のパラメータの行数（見出しと値）。 */
+/** 問題のパラメータの行数（見出しと値）。同じく目安。 */
 const PARAMETER_ROWS = 2;
 
 /** ブロックの見出し。角括弧は外してある。 */
@@ -40,27 +40,40 @@ export interface EclassSections {
   /** 問題のパラメータ。後半の列に選択肢ラベルが入る。 */
   parameters: string[][];
   blocks: EclassBlock[];
+  /** 説明と食い違ったところ。止めるほどではないが目を通してほしい。 */
+  notes: string[];
 }
 
 /**
  * ファイルを、ヘッダ・パラメータ・ブロックの並びに切り分ける。
  *
- * 行数が説明と違っていたら、どこで食い違ったかを言って止まる。e-class の版が
- * 変わって前置きの行数が動いたら、PREAMBLE_ROWS を直すか、最初の `[...]` の
- * 行を探して数える形に変える。
+ * 行数は決め打ちにせず、空行と `[...]` の見出しで区切って数える。eClass の版が
+ * 変わって前置きの行数が動いても通る。説明と行数が食い違ったら notes に書き出す
+ * だけで、止めはしない。
  */
 export function splitSections(text: string): EclassSections {
   const rows = parseCsv(text);
-  let at = 0;
+  const notes: string[] = [];
 
-  const preamble = rows.slice(at, (at += PREAMBLE_ROWS));
-  if (preamble.length < PREAMBLE_ROWS) throw new Error("ヘッダが 5 行ありません");
+  let at = skipBlanks(rows, 0);
+  const preamble = takeChunk(rows, at);
+  at = skipBlanks(rows, at + preamble.length);
+  if (preamble.length !== PREAMBLE_ROWS) {
+    notes.push(`ヘッダが ${preamble.length} 行あります（説明では ${PREAMBLE_ROWS} 行）`);
+  }
 
-  at = skipBlank(rows, at, "ヘッダの後");
-  const parameters = rows.slice(at, (at += PARAMETER_ROWS));
-  if (parameters.length < PARAMETER_ROWS) throw new Error("パラメータが 2 行ありません");
-
-  at = skipBlank(rows, at, "パラメータの後");
+  const parameters = takeChunk(rows, at);
+  at = skipBlanks(rows, at + parameters.length);
+  if (parameters.length === 0) {
+    throw new Error(
+      preamble.length === 0
+        ? "空のファイルです"
+        : "ヘッダの後にパラメータの行がありません（次に来たのは [...] の見出しか終端）"
+    );
+  }
+  if (parameters.length !== PARAMETER_ROWS) {
+    notes.push(`パラメータが ${parameters.length} 行あります（説明では ${PARAMETER_ROWS} 行）`);
+  }
 
   const blocks: EclassBlock[] = [];
   let current: EclassBlock | null = null;
@@ -80,7 +93,7 @@ export function splitSections(text: string): EclassSections {
   }
 
   if (blocks.length === 0) throw new Error("[...] のブロックが一つもありません");
-  return { preamble, parameters, blocks };
+  return { preamble, parameters, blocks, notes };
 }
 
 /** 見出しでブロックを引く。全角と半角の括弧・コロンの違いは無視する。 */
@@ -153,10 +166,21 @@ function titleOf(row: readonly string[]): string | null {
   return match === null || row.slice(1).some((cell) => cell.trim() !== "") ? null : match[1]!;
 }
 
-function skipBlank(rows: readonly string[][], at: number, where: string): number {
-  const row = rows[at];
-  if (row === undefined || !isBlank(row)) throw new Error(`${where}に空行がありません`);
-  return at + 1;
+/** 空行を読み飛ばす。 */
+function skipBlanks(rows: readonly string[][], at: number): number {
+  while (at < rows.length && isBlank(rows[at]!)) at++;
+  return at;
+}
+
+/** 空行か `[...]` の見出しに当たるまでの、ひと続きの行。 */
+function takeChunk(rows: readonly string[][], at: number): string[][] {
+  const chunk: string[][] = [];
+  for (let i = at; i < rows.length; i++) {
+    const row = rows[i]!;
+    if (isBlank(row) || titleOf(row) !== null) break;
+    chunk.push(row);
+  }
+  return chunk;
 }
 
 /** 全角の括弧とコロンを半角に寄せる。見出しの表記ゆれを吸収するため。 */
