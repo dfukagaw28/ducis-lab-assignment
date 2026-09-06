@@ -106,6 +106,21 @@ describe("splitSections", () => {
     expect(findBlock(empty, BLOCKS.answers).rows).toEqual([]);
   });
 
+  it("見出しの行に余分な欄があっても見出しとして扱い、次のブロックと繋げない", () => {
+    const messy = splitSections(
+      fixture.replace(`[${BLOCKS.counts}]`, `[${BLOCKS.counts}],QNo.,件数`)
+    );
+    expect(messy.blocks).toHaveLength(5);
+    expect(findBlock(messy, BLOCKS.counts).rows).toEqual([["e", "f"]]);
+    expect(messy.notes.join()).toMatch(/余分な欄/);
+  });
+
+  it("同じ見出しが繰り返されたら notes で知らせる", () => {
+    const twice = splitSections(`${fixture}\n[${BLOCKS.answers}]\ng,h\n`);
+    expect(twice.blocks).toHaveLength(6);
+    expect(twice.notes.join()).toMatch(/\[回答一覧\] のブロックが 2 個/);
+  });
+
   it("パラメータもブロックも無ければ止まる", () => {
     expect(() => splitSections("a\nb\n")).toThrow(/パラメータの行がありません/);
   });

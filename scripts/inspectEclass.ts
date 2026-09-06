@@ -93,6 +93,17 @@ for (const block of sections.blocks) {
   if (block.rows.length > shown.length) {
     console.log(`  … 残り ${block.rows.length - shown.length} 行 (--rows で増やせます)`);
   }
+
+  // 本文に [...] が現れたら、見出しを取りこぼしてブロックが繋がった疑いがある
+  block.rows.forEach((row, index) => {
+    const at = row.findIndex((cell) => /^\[.+\]$/.test(cell.trim()));
+    if (at >= 0) {
+      console.log(
+        `  ⚠ ${index}行目の ${at} 列目が見出しに見えます: ${cut(row[at]!)}` +
+          (at === 0 ? "" : "（1 列目でないので見出しとして扱われていません）")
+      );
+    }
+  });
 }
 
 function dump(rows: readonly string[][], from: number): void {
