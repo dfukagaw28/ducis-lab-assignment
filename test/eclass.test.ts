@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BLOCKS, findBlock, splitSections, stripHtml } from "../src/io/lms.js";
+import { BLOCKS, findBlock, splitSections, stripHtml } from "../src/io/eclass.js";
 
 /**
  * 実ファイルは個人情報を含むので置けない。形だけを真似た作り物で、構造の

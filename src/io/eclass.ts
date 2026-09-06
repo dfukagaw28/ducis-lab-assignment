@@ -1,7 +1,7 @@
 /**
- * LMS が書き出す希望順位ファイルのパーサ。
+ * eClass (LMS) が書き出す希望順位ファイルのパーサ。
  *
- * ファイルの形は DESIGN.md の「LMS の希望順位ファイル」を参照。ここでは
+ * ファイルの形は DESIGN.md の「eClass の希望順位ファイル」を参照。ここでは
  * 構造を切り分けるところまでを用意してあり、中身の読み取り
  * (`parseOptionLabels` と `parseUserAnswers`) はこれから書く。
  *
@@ -28,28 +28,28 @@ export const BLOCKS = {
   counts: "回答数リスト（表形式の設問のみ）",
 } as const;
 
-export interface LmsBlock {
+export interface EclassBlock {
   /** 角括弧を外した見出し */
   title: string;
   rows: string[][];
 }
 
-export interface LmsSections {
+export interface EclassSections {
   /** 冒頭のヘッダ。使わないが、取り違えに気づけるよう残す。 */
   preamble: string[][];
   /** 問題のパラメータ。後半の列に選択肢ラベルが入る。 */
   parameters: string[][];
-  blocks: LmsBlock[];
+  blocks: EclassBlock[];
 }
 
 /**
  * ファイルを、ヘッダ・パラメータ・ブロックの並びに切り分ける。
  *
- * 行数が説明と違っていたら、どこで食い違ったかを言って止まる。LMS の版が
+ * 行数が説明と違っていたら、どこで食い違ったかを言って止まる。eClass の版が
  * 変わって前置きの行数が動いたら、PREAMBLE_ROWS を直すか、最初の `[...]` の
  * 行を探して数える形に変える。
  */
-export function splitSections(text: string): LmsSections {
+export function splitSections(text: string): EclassSections {
   const rows = parseCsv(text);
   let at = 0;
 
@@ -62,8 +62,8 @@ export function splitSections(text: string): LmsSections {
 
   at = skipBlank(rows, at, "パラメータの後");
 
-  const blocks: LmsBlock[] = [];
-  let current: LmsBlock | null = null;
+  const blocks: EclassBlock[] = [];
+  let current: EclassBlock | null = null;
   for (; at < rows.length; at++) {
     const row = rows[at]!;
     if (isBlank(row)) continue;
@@ -84,7 +84,7 @@ export function splitSections(text: string): LmsSections {
 }
 
 /** 見出しでブロックを引く。全角と半角の括弧・コロンの違いは無視する。 */
-export function findBlock(sections: LmsSections, title: string): LmsBlock {
+export function findBlock(sections: EclassSections, title: string): EclassBlock {
   const wanted = normalizeTitle(title);
   const found = sections.blocks.find((block) => normalizeTitle(block.title) === wanted);
   if (found === undefined) throw new Error(`[${title}] のブロックがありません`);
@@ -111,7 +111,7 @@ export function parseOptionLabels(parameters: readonly string[][]): Map<string, 
  *       研究室の名前は labels で引く。
  */
 export function parseUserAnswers(
-  block: LmsBlock,
+  block: EclassBlock,
   labels: ReadonlyMap<string, string>
 ): PreferenceRow[] {
   throw new Error(
@@ -122,7 +122,7 @@ export function parseUserAnswers(
 /**
  * 入口。intake.ts からは、暫定 CSV の parsePreferences の代わりにこれを呼ぶ。
  */
-export function parseLmsPreferences(text: string): PreferenceRow[] {
+export function parseEclassPreferences(text: string): PreferenceRow[] {
   const sections = splitSections(text);
   return parseUserAnswers(findBlock(sections, BLOCKS.perUser), parseOptionLabels(sections.parameters));
 }
