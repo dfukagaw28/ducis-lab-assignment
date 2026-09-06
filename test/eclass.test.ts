@@ -93,6 +93,19 @@ describe("splitSections", () => {
     );
   });
 
+  it("末尾の空行やカンマだけの行はブロックの行に数えない", () => {
+    // eClass は最後のブロックの後ろに空の行を並べることがある
+    const padded = splitSections(`${fixture}\n,,\n,,\n\n\n`);
+    const last = padded.blocks[padded.blocks.length - 1]!;
+    expect(last.title).toBe(BLOCKS.counts);
+    expect(last.rows).toEqual([["e", "f"]]);
+  });
+
+  it("見出しだけで中身の無いブロックは 0 行になる", () => {
+    const empty = splitSections(fixture.replace("[回答一覧]\na,b\n", "[回答一覧]\n"));
+    expect(findBlock(empty, BLOCKS.answers).rows).toEqual([]);
+  });
+
   it("パラメータもブロックも無ければ止まる", () => {
     expect(() => splitSections("a\nb\n")).toThrow(/パラメータの行がありません/);
   });
