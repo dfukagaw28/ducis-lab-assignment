@@ -45,6 +45,12 @@ try {
   process.exit(1);
 }
 
+if (sections.notes.length > 0) {
+  console.log("=== 注意 ===");
+  for (const note of sections.notes) console.log(`  ${note}`);
+  console.log();
+}
+
 console.log("=== ヘッダ (使わない) ===");
 dump(sections.preamble, 1);
 
