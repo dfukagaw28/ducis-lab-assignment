@@ -20,9 +20,12 @@ const args = process.argv.slice(2);
 const path = args.find((arg) => !arg.startsWith("-"));
 const rowsIndex = args.indexOf("--rows");
 const maxRows = rowsIndex < 0 ? 3 : Number(args[rowsIndex + 1] ?? 3);
+const blockIndex = args.indexOf("--block");
+/** 指定すると、見出しにこれを含むブロックだけを、行数の上限なしで出す。 */
+const onlyBlock = blockIndex < 0 ? null : (args[blockIndex + 1] ?? null);
 
 if (path === undefined) {
-  console.error("使い方: npm run inspect -- <ファイル> [--rows N]");
+  console.error("使い方: npm run inspect -- <ファイル> [--rows N] [--block 見出しの一部]");
   process.exit(1);
 }
 
@@ -67,14 +70,26 @@ for (let i = 0; i < width; i++) {
 
 console.log("\n=== ブロック ===");
 for (const block of sections.blocks) {
-  console.log(`\n[${block.title}]  ${block.rows.length} 行`);
-  const shown = block.rows.slice(0, maxRows);
+  if (onlyBlock !== null && !block.title.includes(onlyBlock)) continue;
+
+  const widths = new Set(block.rows.map((row) => row.length));
+  console.log(`\n[${block.title}]  ${block.rows.length} 行  列数 ${[...widths].join("/")}`);
+
+  const limit = onlyBlock === null ? maxRows : block.rows.length;
+  const shown = block.rows.slice(0, limit);
+
+  // 見出しらしい 1 行目だけは列番号つきで縦に、残りは 1 行 1 行で
   shown.forEach((row, index) => {
-    console.log(`  ${index === 0 ? "見出し?" : `${index}行目 `} ${row.length} 列`);
-    row.forEach((cell, column) => {
-      if (cell.trim() !== "") console.log(`    [${String(column).padStart(2)}] ${cut(cell)}`);
-    });
+    if (index === 0) {
+      console.log(`  見出し? ${row.length} 列`);
+      row.forEach((cell, column) =>
+        console.log(`    [${String(column).padStart(2)}] ${cut(cell) || "(空)"}`)
+      );
+    } else {
+      console.log(`  ${String(index).padStart(3)}行目 (${row.length}列): ${line(row)}`);
+    }
   });
+
   if (block.rows.length > shown.length) {
     console.log(`  … 残り ${block.rows.length - shown.length} 行 (--rows で増やせます)`);
   }
@@ -82,6 +97,11 @@ for (const block of sections.blocks) {
 
 function dump(rows: readonly string[][], from: number): void {
   rows.forEach((row, index) => console.log(`  ${index + from}: ${row.map((c) => cut(c)).join(" | ")}`));
+}
+
+/** 空欄も見えるように、全部の列を区切って並べる。 */
+function line(row: readonly string[]): string {
+  return row.map((cell) => cut(cell, 20)).join(" | ");
 }
 
 function cut(text: string, limit = 60): string {
