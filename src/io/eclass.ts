@@ -12,8 +12,13 @@
 import { parseCsv } from "./csv.js";
 import type { PreferenceRow } from "./parsers.js";
 
-/** 冒頭の、教材名や出力日時が書かれた行数。数えるのは空行までなので、目安。 */
-const PREAMBLE_ROWS = 5;
+/**
+ * 冒頭の、教材名や出力日時が書かれた行数。中身は使わない。
+ *
+ * 出力時のオプションによって 5 行にも 6 行にもなるので、範囲でしか見ない。
+ * どちらも正常なので注意書きは出さない。
+ */
+const PREAMBLE_ROWS = { min: 5, max: 6 };
 
 /** 問題のパラメータの行数（見出しと値）。同じく目安。 */
 const PARAMETER_ROWS = 2;
@@ -58,8 +63,11 @@ export function splitSections(text: string): EclassSections {
   let at = skipBlanks(rows, 0);
   const preamble = takeChunk(rows, at);
   at = skipBlanks(rows, at + preamble.length);
-  if (preamble.length !== PREAMBLE_ROWS) {
-    notes.push(`ヘッダが ${preamble.length} 行あります（説明では ${PREAMBLE_ROWS} 行）`);
+  if (preamble.length < PREAMBLE_ROWS.min || preamble.length > PREAMBLE_ROWS.max) {
+    notes.push(
+      `ヘッダが ${preamble.length} 行あります` +
+        `（想定は ${PREAMBLE_ROWS.min}〜${PREAMBLE_ROWS.max} 行）`
+    );
   }
 
   const parameters = takeChunk(rows, at);
