@@ -1,0 +1,24 @@
+# 依存パッケージ・ビルド成果物
+node_modules/
+dist/
+*.tsbuildinfo
+
+# 個人情報を含む実データは絶対にコミットしない
+# （学籍番号・氏名・GPA・成績・裁量点）
+data/
+private/
+*.xlsx
+*.xls
+*.csv
+!samples/**/*.csv
+
+# エディタ・OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# ログ・一時ファイル
+*.log
+.env
+.env.*
