@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "inspect": "vite-node -c vitest.config.ts scripts/inspectEclass.ts"
   },
   "dependencies": {
     "hospital-resident-matching": "^0.1.0"
