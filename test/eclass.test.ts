@@ -72,11 +72,19 @@ describe("splitSections", () => {
     expect(sections.notes).toEqual([]);
   });
 
-  it("ヘッダの行数が違っても通し、notes に残す", () => {
-    const extra = splitSections(fixture.replace("備考,---\n", "備考,---\n追記,---\n"));
-    expect(extra.preamble).toHaveLength(6);
-    expect(extra.blocks).toHaveLength(5);
-    expect(extra.notes.join()).toMatch(/ヘッダが 6 行/);
+  it("ヘッダが 6 行でも通し、出力オプションの差なので注意もしない", () => {
+    const six = splitSections(fixture.replace("備考,---\n", "備考,---\n追記,---\n"));
+    expect(six.preamble).toHaveLength(6);
+    expect(six.parameters).toHaveLength(2);
+    expect(six.blocks).toHaveLength(5);
+    expect(six.notes).toEqual([]);
+  });
+
+  it("想定の範囲を外れた行数なら notes に残す", () => {
+    const many = splitSections(fixture.replace("備考,---\n", "備考,---\na,1\nb,2\nc,3\n"));
+    expect(many.preamble).toHaveLength(8);
+    expect(many.blocks).toHaveLength(5);
+    expect(many.notes.join()).toMatch(/ヘッダが 8 行/);
   });
 
   it("ヘッダとパラメータの間に空行が無ければ、パラメータを見失ったと言う", () => {
