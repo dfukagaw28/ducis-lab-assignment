@@ -115,6 +115,25 @@ describe("splitSections", () => {
     expect(messy.notes.join()).toMatch(/余分な欄/);
   });
 
+  it("角括弧の後ろに但し書きが続く見出しも見出しとして扱う", () => {
+    const withRemark = splitSections(
+      `${fixture}\n[解答の正否リスト](最新結果のみ表示しています)\ni,j\n`
+    );
+    const last = withRemark.blocks[withRemark.blocks.length - 1]!;
+    expect(last.title).toBe("解答の正否リスト");
+    expect(last.remark).toBe("(最新結果のみ表示しています)");
+    expect(last.rows).toEqual([["i", "j"]]);
+    // 但し書きは見出しに含めないので、素の名前で引ける
+    expect(findBlock(withRemark, "解答の正否リスト")).toBe(last);
+  });
+
+  it("但し書き付きの見出しでも、前のブロックを終わらせる", () => {
+    const withRemark = splitSections(
+      `${fixture}\n[解答の正否リスト](最新結果のみ表示しています)\ni,j\n`
+    );
+    expect(findBlock(withRemark, BLOCKS.counts).rows).toEqual([["e", "f"]]);
+  });
+
   it("同じ見出しが繰り返されたら notes で知らせる", () => {
     const twice = splitSections(`${fixture}\n[${BLOCKS.answers}]\ng,h\n`);
     expect(twice.blocks).toHaveLength(6);

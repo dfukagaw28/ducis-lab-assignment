@@ -34,8 +34,10 @@ export const BLOCKS = {
 } as const;
 
 export interface EclassBlock {
-  /** 角括弧を外した見出し */
+  /** 角括弧の中だけを取り出した見出し */
   title: string;
+  /** 角括弧の後ろに付いていた但し書き。例: `(最新結果のみ表示しています)` */
+  remark?: string;
   rows: string[][];
 }
 
@@ -89,13 +91,13 @@ export function splitSections(text: string): EclassSections {
     const row = rows[at]!;
     if (isBlank(row)) continue;
 
-    const title = titleOf(row);
-    if (title !== null) {
+    const heading = headingOf(row);
+    if (heading !== null) {
       const trailing = trailingCells(row);
       if (trailing.length > 0) {
-        notes.push(`[${title}] の見出しの行に余分な欄があります: ${trailing.join(" | ")}`);
+        notes.push(`[${heading.title}] の見出しの行に余分な欄があります: ${trailing.join(" | ")}`);
       }
-      current = { title, rows: [] };
+      current = { ...heading, rows: [] };
       blocks.push(current);
     } else if (current !== null) {
       current.rows.push(row);
@@ -181,15 +183,21 @@ function isBlank(row: readonly string[]): boolean {
 /**
  * `[ユーザ毎の回答リスト]` の行なら見出しを返す。そうでなければ null。
  *
- * 見た目は 1 列目だけで決める。かつて「他の列がすべて空であること」も求めて
- * いたが、見出しの行に余分な欄が付いているファイルがあり、そこでブロックが
- * 次のブロックとつながってしまった。角括弧で始まって角括弧で終わる欄が本文に
- * 現れることは無いので、1 列目だけで足りる。余分な欄があれば notes で知らせる。
+ * 判定は 1 列目だけで決める。かつては「他の列がすべて空であること」も、
+ * 「角括弧で終わること」も求めていたが、どちらも実ファイルには狭すぎた。
+ * 見出しの行に余分な欄が付いていることがあり、
+ * `[解答の正否リスト](最新結果のみ表示しています)` のように角括弧の後ろに
+ * 但し書きが続くこともある。どちらでもブロックが次のブロックと繋がっていた。
+ *
+ * 角括弧で始まる欄が本文に現れることは無いので、頭の `[...]` だけを見て、
+ * 後ろに続く文字は但し書きとして取っておく。
  */
-function titleOf(row: readonly string[]): string | null {
+function headingOf(row: readonly string[]): { title: string; remark?: string } | null {
   if (row.length === 0) return null;
-  const match = /^\[(.+)\]$/.exec(row[0]!.trim());
-  return match === null ? null : match[1]!;
+  const match = /^\[([^\]]+)\](.*)$/.exec(row[0]!.trim());
+  if (match === null) return null;
+  const remark = match[2]!.trim();
+  return { title: match[1]!.trim(), ...(remark === "" ? {} : { remark }) };
 }
 
 /** 見出しの行に付いていた、1 列目より後ろの中身。 */
@@ -208,7 +216,7 @@ function takeChunk(rows: readonly string[][], at: number): string[][] {
   const chunk: string[][] = [];
   for (let i = at; i < rows.length; i++) {
     const row = rows[i]!;
-    if (isBlank(row) || titleOf(row) !== null) break;
+    if (isBlank(row) || headingOf(row) !== null) break;
     chunk.push(row);
   }
   return chunk;

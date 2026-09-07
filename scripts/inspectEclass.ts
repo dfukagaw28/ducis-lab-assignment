@@ -73,7 +73,10 @@ for (const block of sections.blocks) {
   if (onlyBlock !== null && !block.title.includes(onlyBlock)) continue;
 
   const widths = new Set(block.rows.map((row) => row.length));
-  console.log(`\n[${block.title}]  ${block.rows.length} 行  列数 ${[...widths].join("/")}`);
+  const remark = block.remark === undefined ? "" : ` ${block.remark}`;
+  console.log(
+    `\n[${block.title}]${remark}  ${block.rows.length} 行  列数 ${[...widths].join("/")}`
+  );
 
   const limit = onlyBlock === null ? maxRows : block.rows.length;
   const shown = block.rows.slice(0, limit);
