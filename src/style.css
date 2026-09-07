@@ -171,3 +171,9 @@ button.primary {
 .unlisted {
   color: color-mix(in srgb, orange 70%, currentColor);
 }
+
+.source {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}

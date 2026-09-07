@@ -31,6 +31,7 @@ describe("page", () => {
     app.querySelector<HTMLButtonElement>("#useSample")!.click();
 
     const output = app.querySelector<HTMLElement>("#output")!;
+    expect(output.textContent).toContain("サンプルデータ（合成、実ファイルではありません）");
     expect(output.querySelectorAll("table").length).toBeGreaterThanOrEqual(3);
     expect(output.textContent).toContain("ブロッキングペアはありません");
     expect(output.querySelectorAll("[data-download]")).toHaveLength(3);
@@ -47,5 +48,22 @@ describe("page", () => {
 
     expect(seed.value).not.toBe(before);
     expect(app.querySelector<HTMLElement>("#output")!.textContent).toContain(seed.value);
+  });
+
+  it("ファイルを入れると、前の入力で出した結果を消す", async () => {
+    const output = app.querySelector<HTMLElement>("#output")!;
+    expect(output.textContent).toContain("サンプルデータ");
+
+    // ドロップゾーンにファイルを落とす（jsdom には DataTransfer が無いので手で作る）
+    const file = new File(["研究室,研究室名,定員\nL01,甲,3\n"], "labs.csv", { type: "text/csv" });
+    const event = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", { value: { files: [file] } });
+    app.querySelector<HTMLElement>("#drop")!.dispatchEvent(event);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // 残っていると、いま入れたファイルの結果だと思って読まれてしまう
+    expect(output.innerHTML).toBe("");
+    expect(app.querySelector<HTMLElement>("#warnings")!.hidden).toBe(true);
+    expect(app.querySelector("#fileTable")).not.toBeNull();
   });
 });
