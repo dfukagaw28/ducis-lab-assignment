@@ -55,7 +55,7 @@ export function parseCsv(text: string): string[][] {
   }
 
   // 末尾に改行があれば空行が一つできるので、それだけは落とす
-  if (field !== "" || row.length > 0) endRow();
+  if (started || row.length > 0) endRow();
 
   return rows;
 }
@@ -81,12 +81,8 @@ function quote(value: CsvValue): string {
 export function withHeader(rows: readonly string[][]): Array<Record<string, string>> {
   const [header, ...body] = rows;
   if (header === undefined) return [];
-  const keys = header.map(normalize);
+  const keys = header.map((h) => h.trim());
   return body
     .filter((row) => row.some((cell) => cell.trim() !== ""))
     .map((row) => Object.fromEntries(keys.map((key, i) => [key, (row[i] ?? "").trim()])));
-}
-
-export function normalize(text: string): string {
-  return text.replace(/^[\s　]+|[\s　]+$/g, "");
 }
