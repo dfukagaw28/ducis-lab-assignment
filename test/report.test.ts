@@ -37,6 +37,33 @@ describe("buildReport", () => {
     expect(report.summary.blockingPairs).toEqual([]);
   });
 
+  it("研究室ごとにまとめ、研究室の中は学生 ID 順に並べる", () => {
+    const order = instance.labs.map((lab) => lab.id);
+    let previousLab = -1;
+    let previousId = "";
+    for (const row of report.students) {
+      const at = row.lab === null ? order.length : order.indexOf(row.lab);
+      expect(at).toBeGreaterThanOrEqual(previousLab);
+      if (at === previousLab) expect(row.id > previousId).toBe(true);
+      else previousId = "";
+      previousLab = at;
+      previousId = row.id;
+    }
+  });
+
+  it("未配属の学生は最後に並べる", () => {
+    const tight: Instance = {
+      students: [
+        { id: "s2", gpa: 3, preferences: ["X"] },
+        { id: "s1", gpa: 4, preferences: ["X"] },
+      ],
+      labs: [{ id: "X", capacity: 1, scores: new Map([["s1", 10], ["s2", 0]]) }],
+    };
+    const rows = buildReport(tight, assign(tight, params)).students;
+    expect(rows.map((row) => row.id)).toEqual(["s1", "s2"]);
+    expect(rows[1]!.lab).toBeNull();
+  });
+
   it("シードを結果に残す", () => {
     expect(report.summary.seed).toBe(params.seed);
   });
