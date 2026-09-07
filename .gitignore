@@ -11,6 +11,7 @@ private/
 *.xls
 *.csv
 !samples/**/*.csv
+!samples/**/*.xlsx
 
 # エディタ・OS
 .DS_Store

@@ -5,7 +5,7 @@
  * 外れていれば画面で直せるようにする。
  */
 
-import { readTextFile } from "../io/decode.js";
+import { readInputFile } from "../io/decode.js";
 import { guessRole, ROLE_LABELS, ROLES, type FileRole, type SourceFile } from "../io/intake.js";
 
 export interface DropZone {
@@ -19,7 +19,8 @@ export function createDropZone(root: HTMLElement): DropZone {
   root.innerHTML = `
     <div id="drop" class="drop">
       <p>入力ファイルをここにドロップ<span class="hint">（クリックして選ぶこともできます）</span></p>
-      <input id="picker" type="file" multiple accept=".csv,.txt" hidden />
+      <p class="hint">CSV・Excel (.xlsx)・eClass の書き出し (.txt)</p>
+      <input id="picker" type="file" multiple accept=".csv,.txt,.xlsx" hidden />
     </div>
     <p id="dropError" class="error" hidden></p>
     <table id="fileTable" class="files" hidden>
@@ -46,10 +47,10 @@ export function createDropZone(root: HTMLElement): DropZone {
     error.hidden = true;
     try {
       for (const file of Array.from(list)) {
-        const text = await readTextFile(file);
+        const content = await readInputFile(file);
         // 同じ名前で入れ直したときは置き換える
         const at = files.findIndex((entry) => entry.name === file.name);
-        const entry: SourceFile = { name: file.name, role: guessRole(file.name), text };
+        const entry: SourceFile = { name: file.name, role: guessRole(file.name), ...content };
         if (at < 0) files.push(entry);
         else files[at] = entry;
       }
