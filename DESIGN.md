@@ -155,6 +155,11 @@ discretionaryPoint(h,s) = h.scores.get(s.id)               // 既定 60 点満�
 （流れは分けてある）ので、同じシードなら同じ並びになる。学籍番号と研究室を辞書順に
 整列してから引くので、入力ファイルの行順にも依らない。
 
+持つのは足した分（`Assignment.preferenceRest`）だけで、繋いだ表は使うところで作る
+（`completedPreferences`）。学生自身の表は `Student.preferences` にあるので、繋いだ表を
+持つと二重に抱えることになり、どこまでが学生の書いた分かも読めなくなる。ライブラリが
+`residentPrefs` と `residentPrefsRest` を分けて持つのと同じ形。
+
 これで定員の合計が学生数以上なら未配属は出ない。代わりに「自分で順位を付けていない
 研究室に配属された学生」が出るので、結果ではそれを**希望外**として区別する
 （`StudentRow.listed`、`Summary.unlisted`）。希望順位の内訳は学生が自分で付けた

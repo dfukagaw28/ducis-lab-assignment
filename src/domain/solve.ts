@@ -8,7 +8,7 @@
 import { stableMatch, type Hospital, type Resident } from "hospital-resident-matching";
 
 import { drawLottery } from "./lottery.js";
-import { completePreferences } from "./preferences.js";
+import { completedPreferences, drawPreferenceRest } from "./preferences.js";
 import { rankAll, type ScoredStudent } from "./score.js";
 import type { Instance, LabId, Params, StudentId } from "./types.js";
 
@@ -20,8 +20,11 @@ export interface Assignment {
   /** 研究室に配属された学生。選好の高い順 */
   labToStudents: Map<LabId, StudentId[]>;
   lottery: Map<StudentId, number>;
-  /** 実際に解くのに使った、全研究室まで広げた希望順位表 */
-  completed: Map<StudentId, LabId[]>;
+  /**
+   * 学生が順位を付けなかった研究室を、補完のために並べたもの。
+   * 学生自身の表と繋ぐと、実際に解くのに使った表になる（completedPreferences）。
+   */
+  preferenceRest: Map<StudentId, LabId[]>;
   /** 研究室ごとの、点数をつけて並べた全学生 */
   rankings: Map<LabId, ScoredStudent[]>;
 }
@@ -45,11 +48,11 @@ export function assign(instance: Instance, params: Params): Assignment {
   const rankings = rankAll(labs, students, params, lottery);
 
   // 順位を付けなかった研究室はランダムに並べて下に付ける
-  const completed = completePreferences(students, labs, params.seed);
+  const preferenceRest = drawPreferenceRest(students, labs, params.seed);
 
   const residents: Resident[] = students.map((student) => ({
     id: student.id,
-    preferences: completed.get(student.id)!,
+    preferences: completedPreferences(student.preferences, preferenceRest.get(student.id)),
   }));
   const hospitals: Hospital[] = labs.map((lab) => ({
     id: lab.id,
@@ -64,7 +67,7 @@ export function assign(instance: Instance, params: Params): Assignment {
     studentToLab: new Map(students.map((s) => [s.id, result.residents[s.id]])),
     labToStudents: new Map(labs.map((lab) => [lab.id, result.hospitals[lab.id] ?? []])),
     lottery,
-    completed,
+    preferenceRest,
     rankings,
   };
 }

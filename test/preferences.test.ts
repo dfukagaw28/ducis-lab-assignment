@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { completePreferences } from "../src/domain/preferences.js";
+import { completedPreferences, drawPreferenceRest } from "../src/domain/preferences.js";
 import { buildReport } from "../src/domain/report.js";
 import { assign } from "../src/domain/solve.js";
 import { defaultParams, type Instance, type Lab, type Params, type Student } from "../src/domain/types.js";
@@ -23,46 +23,64 @@ const students: Student[] = [
   { id: "s4", gpa: 3, preferences: ["D"] },
 ];
 
-describe("completePreferences", () => {
-  const completed = completePreferences(students, labs, 20260907);
+describe("drawPreferenceRest", () => {
+  const rest = drawPreferenceRest(students, labs, 20260907);
+  const completed = (id: string) =>
+    completedPreferences(students.find((s) => s.id === id)!.preferences, rest.get(id));
 
-  it("順位を付けた研究室をそのままの順で上位に置く", () => {
-    expect(completed.get("s1")!.slice(0, 2)).toEqual(["B", "A"]);
-    expect(completed.get("s4")![0]).toBe("D");
+  it("学生が順位を付けなかった研究室だけを並べる", () => {
+    expect(new Set(rest.get("s1")!)).toEqual(new Set(["C", "D"]));
+    expect(new Set(rest.get("s4")!)).toEqual(new Set(["A", "B", "C"]));
   });
 
-  it("残りの研究室を下位に足して全研究室を並べる", () => {
+  it("順位を付けた研究室をそのままの順で上位に置く", () => {
+    expect(completed("s1").slice(0, 2)).toEqual(["B", "A"]);
+    expect(completed("s4")[0]).toBe("D");
+  });
+
+  it("繋ぐと全研究室が一度ずつ並ぶ", () => {
     for (const student of students) {
-      const list = completed.get(student.id)!;
+      const list = completed(student.id);
       expect(list).toHaveLength(labs.length);
       expect(new Set(list).size).toBe(labs.length);
     }
   });
 
   it("順位を一つも付けていない学生には全研究室を並べる", () => {
-    expect(new Set(completed.get("s2")!)).toEqual(new Set(["A", "B", "C", "D"]));
+    expect(new Set(rest.get("s2")!)).toEqual(new Set(["A", "B", "C", "D"]));
   });
 
-  it("もともと完全な表はそのまま", () => {
-    expect(completed.get("s3")).toEqual(["A", "B", "C", "D"]);
+  it("もともと完全な表には何も足さない", () => {
+    expect(rest.get("s3")).toEqual([]);
+    expect(completed("s3")).toEqual(["A", "B", "C", "D"]);
   });
 
   it("同じシードなら同じ並びになる", () => {
-    expect(completePreferences(students, labs, 20260907)).toEqual(completed);
+    expect(drawPreferenceRest(students, labs, 20260907)).toEqual(rest);
   });
 
   it("入力の順序を変えても結果は変わらない", () => {
     const shuffled = [students[2]!, students[0]!, students[3]!, students[1]!];
     const reversed = [...labs].reverse();
-    expect(completePreferences(shuffled, reversed, 20260907)).toEqual(completed);
+    expect(drawPreferenceRest(shuffled, reversed, 20260907)).toEqual(rest);
   });
 
-  it("シードを変えれば下位の並びは変わりうる", () => {
+  it("シードを変えれば足す並びは変わりうる", () => {
     const tails = new Set<string>();
     for (let seed = 0; seed < 30; seed++) {
-      tails.add(completePreferences(students, labs, seed).get("s4")!.join(","));
+      tails.add(drawPreferenceRest(students, labs, seed).get("s4")!.join(","));
     }
     expect(tails.size).toBeGreaterThan(1);
+  });
+});
+
+describe("completedPreferences", () => {
+  it("学生の表の後ろに足した分を繋ぐ", () => {
+    expect(completedPreferences(["B", "A"], ["D", "C"])).toEqual(["B", "A", "D", "C"]);
+  });
+
+  it("足す分が無ければ学生の表のまま", () => {
+    expect(completedPreferences(["B", "A"])).toEqual(["B", "A"]);
   });
 });
 
