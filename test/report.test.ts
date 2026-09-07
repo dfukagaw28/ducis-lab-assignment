@@ -70,6 +70,10 @@ describe("findBlockingPairs", () => {
         ["s1", 0],
         ["s2", 1],
       ]),
+      completed: new Map([
+        ["s1", ["X", "Y"]],
+        ["s2", ["X", "Y"]],
+      ]),
       rankings,
     };
     expect(findBlockingPairs(instance, broken)).toEqual([{ student: "s1", lab: "X" }]);

@@ -167,3 +167,7 @@ select {
 button.primary {
   font-weight: 600;
 }
+
+.unlisted {
+  color: color-mix(in srgb, orange 70%, currentColor);
+}
