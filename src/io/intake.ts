@@ -122,10 +122,11 @@ export function buildInstance(files: readonly SourceFile[]): Built {
     if (!ranked.has(id)) warnings.push(`${id} は GPA にあるが希望順位に無い（無視します）`);
   }
 
+  const capacities = resolveCapacities(labRows, students.length, warnings);
   const labs: Lab[] = labRows.map((row) => ({
     id: row.id,
     ...(row.name === undefined ? {} : { name: row.name }),
-    capacity: row.capacity,
+    capacity: capacities.get(row.id)!,
     scores: scores.get(row.id)!,
   }));
 
@@ -138,6 +139,39 @@ export function buildInstance(files: readonly SourceFile[]): Built {
   }
 
   return { instance: { students, labs }, warnings };
+}
+
+/**
+ * 定員を決める。
+ *
+ * 定員の列が無ければ、学生数を研究室数で割った切り上げを全研究室に入れる。合計が
+ * 学生数以上になるので誰も溢れないが、それは運用上の決定を勝手にしたということ
+ * なので警告する。一部の研究室だけ空欄なのは書き忘れとみなして止める。
+ */
+function resolveCapacities(
+  labRows: readonly LabRow[],
+  numStudents: number,
+  warnings: string[]
+): Map<LabId, number> {
+  const missing = labRows.filter((row) => row.capacity === null);
+
+  if (missing.length === 0) {
+    return new Map(labRows.map((row) => [row.id, row.capacity!]));
+  }
+
+  if (missing.length < labRows.length) {
+    throw new Error(
+      `${missing.map((row) => row.id).join("、")} の定員が空欄です。` +
+        `全研究室の定員を書くか、定員の列ごと省いてください`
+    );
+  }
+
+  const even = Math.ceil(numStudents / labRows.length);
+  warnings.push(
+    `定員の指定が無いので、全研究室を ${even} 人（学生 ${numStudents} 人 ÷ ` +
+      `研究室 ${labRows.length} 室 の切り上げ）としました`
+  );
+  return new Map(labRows.map((row) => [row.id, even]));
 }
 
 /** 研究室一覧 CSV の、選択肢ラベルの列の見出し（エラーで案内するため）。 */

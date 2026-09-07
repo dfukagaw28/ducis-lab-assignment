@@ -90,6 +90,30 @@ describe("buildInstance", () => {
     expect(buildInstance(tight).warnings.some((w) => w.includes("未配属"))).toBe(true);
   });
 
+  it("定員の列が無ければ学生数から割り出し、そう言う", () => {
+    const noCapacity = files.map((file) =>
+      file.role === "labs"
+        ? {
+            ...file,
+            text: file.text
+              .replace("研究室,研究室名,定員", "研究室,研究室名")
+              .replace(/^(L\d+),([^,]*),\d+$/gm, "$1,$2"),
+          }
+        : file
+    );
+    const { instance, warnings } = buildInstance(noCapacity);
+    // 学生 12 人 ÷ 研究室 4 室 = 3
+    expect(instance.labs.map((lab) => lab.capacity)).toEqual([3, 3, 3, 3]);
+    expect(warnings.join()).toMatch(/定員の指定が無いので/);
+  });
+
+  it("一部の研究室だけ定員が空欄なら、書き忘れとみて止まる", () => {
+    const partial = files.map((file) =>
+      file.role === "labs" ? { ...file, text: file.text.replace("L02,知能情報,3", "L02,知能情報,") } : file
+    );
+    expect(() => buildInstance(partial)).toThrow(/L02 の定員が空欄/);
+  });
+
   it("エラーにファイル名を添える", () => {
     const broken = files.map((file) =>
       file.role === "gpa" ? { ...file, text: "学籍番号,GPA\nS001,あ\n" } : file
@@ -152,6 +176,26 @@ describe("buildInstance（eClass のファイルから）", () => {
     );
     const { instance } = buildInstance(spaced);
     expect(instance.students[0]!.preferences).toHaveLength(4);
+  });
+
+  it("定員の列が無ければ切り上げるので、割り切れなくても全員が収まる", () => {
+    const noCapacity = eclassFiles.map((file) =>
+      file.role === "labs"
+        ? {
+            ...file,
+            text: file.text
+              .replace("研究室,研究室名,定員,選択肢ラベル", "研究室,研究室名,選択肢ラベル")
+              .replace(/^(L\d+),([^,]*),\d+,(.*)$/gm, "$1,$2,$3"),
+          }
+        : file
+    );
+    const { instance, warnings } = buildInstance(noCapacity);
+    // 学生 9 人 ÷ 研究室 4 室 = 2.25 → 3
+    expect(instance.labs.map((lab) => lab.capacity)).toEqual([3, 3, 3, 3]);
+    expect(instance.labs.reduce((sum, lab) => sum + lab.capacity, 0)).toBeGreaterThanOrEqual(
+      instance.students.length
+    );
+    expect(warnings.join()).toMatch(/定員の指定が無いので/);
   });
 
   it("突き合わせられない研究室があれば、その名前を言って止まる", () => {
