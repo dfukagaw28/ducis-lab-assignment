@@ -27,6 +27,8 @@ describe("guessRole", () => {
     expect(guessRole("labs.csv")).toBe("labs");
     expect(guessRole("研究室定員.csv")).toBe("labs");
     expect(guessRole("L01.csv")).toBe("scores");
+    expect(guessRole("answer-utf8-sample.txt")).toBe("preferences");
+    expect(guessRole("eclass-scores-L01.csv")).toBe("scores");
   });
 });
 
@@ -93,6 +95,80 @@ describe("buildInstance", () => {
       file.role === "gpa" ? { ...file, text: "学籍番号,GPA\nS001,あ\n" } : file
     );
     expect(() => buildInstance(broken)).toThrow(/gpa\.csv/);
+  });
+});
+
+describe("buildInstance（eClass のファイルから）", () => {
+  const eclassFiles: SourceFile[] = [
+    sample("answer-utf8-sample.txt", "preferences"),
+    sample("eclass-gpa.csv", "gpa"),
+    sample("eclass-labs.csv", "labs"),
+    sample("eclass-scores-L01.csv", "scores"),
+    sample("eclass-scores-L02.csv", "scores"),
+    sample("eclass-scores-L03.csv", "scores"),
+    sample("eclass-scores-L04.csv", "scores"),
+  ];
+
+  it("暫定 CSV でなくても、そうと見分けて読む", () => {
+    const { instance } = buildInstance(eclassFiles);
+    expect(instance.students).toHaveLength(9);
+    expect(instance.labs).toHaveLength(4);
+  });
+
+  it("選択肢ラベルを研究室 ID に読み替える", () => {
+    const { instance } = buildInstance(eclassFiles);
+    const taro = instance.students.find((student) => student.id === "1234560002")!;
+    expect(taro.name).toBe("架空　太郎");
+    // 回答は 4, 1, 3, 2
+    expect(taro.preferences).toEqual(["L04", "L01", "L03", "L02"]);
+  });
+
+  it("回答しなかった学生は希望なしのまま通す", () => {
+    const { instance } = buildInstance(eclassFiles);
+    const blank = instance.students.find((student) => student.id === "1234560005")!;
+    expect(blank.preferences).toEqual([]);
+  });
+
+  it("選択肢ラベルの列が無ければ研究室名で突き合わせる", () => {
+    const byName = eclassFiles.map((file) =>
+      file.role === "labs"
+        ? {
+            ...file,
+            // 選択肢ラベルの列を落とし、研究室名をラベルと同じにする
+            text: file.text
+              .replace("研究室,研究室名,定員,選択肢ラベル", "研究室,研究室名,定員")
+              .replace(/^(L\d+),[^,]*,(\d+),(.*)$/gm, "$1,$3,$2"),
+          }
+        : file
+    );
+    const { instance } = buildInstance(byName);
+    const taro = instance.students.find((student) => student.id === "1234560002")!;
+    expect(taro.preferences).toEqual(["L04", "L01", "L03", "L02"]);
+  });
+
+  it("空白の入れ方が違っても突き合わせる", () => {
+    const spaced = eclassFiles.map((file) =>
+      file.role === "labs" ? { ...file, text: file.text.replace(/　/g, " ") } : file
+    );
+    const { instance } = buildInstance(spaced);
+    expect(instance.students[0]!.preferences).toHaveLength(4);
+  });
+
+  it("突き合わせられない研究室があれば、その名前を言って止まる", () => {
+    const broken = eclassFiles.map((file) =>
+      file.role === "labs" ? { ...file, text: file.text.replace("◇◇研究室（◇◇　◇◇）", "別名") } : file
+    );
+    expect(() => buildInstance(broken)).toThrow(/◇◇研究室（◇◇　◇◇）/);
+    expect(() => buildInstance(broken)).toThrow(/選択肢ラベル/);
+  });
+
+  it("同じ名前の研究室が二つあれば止まる", () => {
+    const clashing = eclassFiles.map((file) =>
+      file.role === "labs"
+        ? { ...file, text: file.text.replace("△△研究室（△△　△△）", "○○研究室（○○　○○）") }
+        : file
+    );
+    expect(() => buildInstance(clashing)).toThrow(/同じ名前/);
   });
 });
 

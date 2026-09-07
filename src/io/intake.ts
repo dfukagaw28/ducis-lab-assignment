@@ -5,8 +5,9 @@
  * 実ファイルのパーサ (M3) が入っても、変わるのは parse の中身だけ。
  */
 
-import type { Instance, Lab, Student, StudentId } from "../domain/types.js";
-import { parseGpa, parseLabs, parsePreferences, parseScores } from "./parsers.js";
+import type { Instance, Lab, LabId, Student, StudentId } from "../domain/types.js";
+import { looksLikeEclass, parseEclassPreferences } from "./eclass.js";
+import { parseGpa, parseLabs, parsePreferences, parseScores, type LabRow } from "./parsers.js";
 
 export const ROLES = ["preferences", "gpa", "labs", "scores"] as const;
 export type FileRole = (typeof ROLES)[number];
@@ -33,7 +34,8 @@ export interface Built {
 /** ファイル名から役割を当てる。外れても画面で直せる。 */
 export function guessRole(fileName: string): FileRole {
   const name = fileName.toLowerCase();
-  if (/希望|preference|choice/.test(name)) return "preferences";
+  // eClass の書き出しはテキスト、他の 3 種類は表計算から出てくる
+  if (/希望|preference|choice|answer|回答|アンケート|\.txt$/.test(name)) return "preferences";
   if (/gpa|成績/.test(name)) return "gpa";
   if (/定員|capacity|研究室一覧|labs?\b/.test(name)) return "labs";
   return "scores";
@@ -49,9 +51,10 @@ export function buildInstance(files: readonly SourceFile[]): Built {
     return found[0]!;
   };
 
-  // TODO(M3): eClass のテキストなら parseEclassPreferences に振り分ける
-  // （io/eclass.ts。中身の読み取りがまだ未実装なので、今は暫定 CSV だけ）
-  const preferenceRows = inFile(only("preferences"), parsePreferences);
+  const preferenceFile = only("preferences");
+  const preferenceRows = inFile(preferenceFile, (text) =>
+    looksLikeEclass(text) ? parseEclassPreferences(text) : parsePreferences(text)
+  );
   const gpa = inFile(only("gpa"), parseGpa);
   const labRows = inFile(only("labs"), parseLabs);
 
@@ -62,6 +65,9 @@ export function buildInstance(files: readonly SourceFile[]): Built {
 
   const labIds = new Set(labRows.map((row) => row.id));
   if (labIds.size !== labRows.length) throw new Error("研究室が重複しています");
+
+  // 希望順位ファイルが研究室をどう呼んでいても引けるようにする
+  const byAnyName = labLookup(labRows);
 
   // 研究室ごとの裁量点。ファイルが分かれていてもまとめて受ける。
   const scores = new Map<string, Map<StudentId, number>>(
@@ -85,13 +91,18 @@ export function buildInstance(files: readonly SourceFile[]): Built {
     if (seen.has(row.id)) throw new Error(`学籍番号 ${row.id} が重複しています`);
     seen.add(row.id);
 
-    for (const labId of row.preferences) {
-      if (!labIds.has(labId)) {
-        throw new Error(`${row.id} の希望に、研究室一覧に無い研究室 ${labId} があります`);
+    const preferences = row.preferences.map((name) => {
+      const labId = byAnyName.get(matchKey(name));
+      if (labId === undefined) {
+        throw new Error(
+          `${row.id} の希望にある「${name}」が研究室一覧に見つかりません。` +
+            `研究室一覧の「${LABEL_COLUMN}」列に、希望順位ファイルの書き方と同じ文字列を入れてください`
+        );
       }
-    }
-    const unique = new Set(row.preferences);
-    if (unique.size !== row.preferences.length) {
+      return labId;
+    });
+    const unique = new Set(preferences);
+    if (unique.size !== preferences.length) {
       throw new Error(`${row.id} の希望に同じ研究室が複数あります`);
     }
 
@@ -102,7 +113,7 @@ export function buildInstance(files: readonly SourceFile[]): Built {
       id: row.id,
       ...(row.name === undefined ? {} : { name: row.name }),
       gpa: score ?? 0,
-      preferences: row.preferences,
+      preferences,
     };
   });
 
@@ -127,6 +138,41 @@ export function buildInstance(files: readonly SourceFile[]): Built {
   }
 
   return { instance: { students, labs }, warnings };
+}
+
+/** 研究室一覧 CSV の、選択肢ラベルの列の見出し（エラーで案内するため）。 */
+const LABEL_COLUMN = "選択肢ラベル";
+
+/**
+ * 研究室を、選択肢ラベル・研究室名・研究室 ID のどれからでも引けるようにする。
+ *
+ * eClass の希望順位ファイルは研究室を `○○研究室（○○　○○）` のような表示名で
+ * 指すのに対し、研究室一覧は `L01` のような ID で持っている。突き合わせるのが
+ * 選択肢ラベルの列で、無ければ研究室名か ID がそのまま使われている場合に備える。
+ */
+function labLookup(labRows: readonly LabRow[]): Map<string, LabId> {
+  const lookup = new Map<string, LabId>();
+  const add = (name: string | undefined, labId: LabId): void => {
+    const key = matchKey(name ?? "");
+    if (key === "") return;
+    const found = lookup.get(key);
+    if (found !== undefined && found !== labId) {
+      throw new Error(`研究室 ${found} と ${labId} が同じ名前「${name}」を持っています`);
+    }
+    lookup.set(key, labId);
+  };
+
+  for (const row of labRows) {
+    add(row.id, row.id);
+    add(row.name, row.id);
+    add(row.label, row.id);
+  }
+  return lookup;
+}
+
+/** 突き合わせ用の鍵。空白（全角も）の入れ方の違いは無視する。 */
+function matchKey(name: string): string {
+  return name.replace(/[\s\u3000]/g, "");
 }
 
 /** パーサの投げるエラーに、どのファイルで起きたのかを添える。 */

@@ -227,6 +227,16 @@ function findColumn(keys: readonly string[], aliases: readonly string[]): number
 }
 
 /**
+ * eClass の書き出したファイルらしいか。
+ *
+ * `[...]` だけの行が現れるのが目印。暫定 CSV にそういう行は無いので、これで
+ * どちらのパーサに渡すかを決められる。
+ */
+export function looksLikeEclass(text: string): boolean {
+  return /^"?\[[^\]\r\n]+\]/m.test(text);
+}
+
+/**
  * 入口。intake.ts からは、暫定 CSV の parsePreferences の代わりにこれを呼ぶ。
  *
  * 研究室は選択肢ラベルの文字列そのままで返す。研究室一覧の側でこの文字列に
