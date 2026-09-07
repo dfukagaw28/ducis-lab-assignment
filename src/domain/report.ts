@@ -78,6 +78,13 @@ export function buildReport(instance: Instance, assignment: Assignment): Report 
     };
   });
 
+  // 表示と書き出しの並び。研究室ごとにまとめ、研究室の中は学生 ID 順。未配属は最後。
+  // 抽選や補完が学籍番号を並べるのと同じ辞書順で揃えてある。
+  const labOrder = new Map(instance.labs.map((lab, index) => [lab.id, index]));
+  const placeOf = (row: StudentRow): number =>
+    row.lab === null ? instance.labs.length : labOrder.get(row.lab)!;
+  students.sort((a, b) => placeOf(a) - placeOf(b) || compareIds(a.id, b.id));
+
   const labs: LabRow[] = instance.labs.map((lab) => {
     const assigned = assignment.labToStudents.get(lab.id) ?? [];
     return {
@@ -162,6 +169,11 @@ export function findBlockingPairs(
   }
 
   return pairs;
+}
+
+/** 辞書順。ロケールに依らせないため、あえて localeCompare を使わない。 */
+function compareIds(a: StudentId, b: StudentId): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /** 研究室ごとの、学生の選好順位（0 始まり）。受け入れ不可の学生は載らない。 */
