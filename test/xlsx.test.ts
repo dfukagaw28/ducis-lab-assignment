@@ -11,7 +11,7 @@ function open(name: string) {
 }
 
 describe("readWorkbook（テンプレート）", () => {
-  const workbook = open("教員裁量点_○○先生（template）.xlsx");
+  const workbook = open("教員裁量点_●●先生（template）.xlsx");
 
   it("シートを名前つきで並べる", () => {
     expect(workbook.sheets.map((sheet) => sheet.name)).toEqual(["教員裁量点", "教員氏名リスト"]);

@@ -78,7 +78,12 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
   );
 
   const gpaFile = only("gpa");
-  const gpa = inFile(gpaFile, () => parseGpaRows(rowsOf(gpaFile)));
+  const gpaRows = inFile(gpaFile, () => parseGpaRows(rowsOf(gpaFile)));
+  const gpa = new Map(gpaRows.map((row) => [row.id, row.gpa]));
+  // 名簿の氏名。希望順位を出していない学生の氏名はここか裁量点の表から取る。
+  const namesFromGpa = new Map<StudentId, string>(
+    gpaRows.filter((row) => row.name !== undefined).map((row) => [row.id, row.name!])
+  );
 
   const labFile = only("labs");
   const labRows = inFile(labFile, () => parseLabRows(rowsOf(labFile)));
@@ -100,6 +105,8 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
   );
   // 希望順位を出していない学生の氏名は、裁量点の表からしか取れない
   const namesFromScores = new Map<StudentId, string>();
+  // どの研究室の点数がどのファイルから来たか（食い違いを指摘するときに使う）
+  const scoreSources = new Map<string, Set<string>>();
   for (const file of scoreFiles) {
     for (const row of inFile(file, () => parseScoreRows(rowsOf(file)))) {
       // 研究室 ID でも、研究室名でも、教員氏名でも引ける
@@ -115,6 +122,11 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
       }
       forLab.set(row.student, row.score);
       if (row.name !== undefined) namesFromScores.set(row.student, row.name);
+
+      const labId = byAnyName.get(matchKey(row.lab))!;
+      const sources = scoreSources.get(labId) ?? new Set<string>();
+      sources.add(file.name);
+      scoreSources.set(labId, sources);
     }
   }
 
@@ -154,7 +166,7 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
   const ranked = new Set(students.map((student) => student.id));
   const absent = [...gpa.keys()].filter((id) => !ranked.has(id)).sort();
   for (const id of absent) {
-    const name = namesFromScores.get(id);
+    const name = namesFromGpa.get(id) ?? namesFromScores.get(id);
     students.push({
       id,
       ...(name === undefined ? {} : { name }),
@@ -168,6 +180,8 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
         `全研究室をランダムな順として扱います`
     );
   }
+
+  checkRoster(students, scores, scoreSources, warnings);
 
   const capacities = resolveCapacities(labRows, students, seed, warnings);
   const labs: Lab[] = labRows.map((row) => ({
@@ -236,6 +250,48 @@ function resolveCapacities(
 /** 研究室一覧 CSV の列の見出し（エラーで案内するため）。 */
 const LABEL_COLUMN = "選択肢ラベル";
 const TEACHER_COLUMN = "教員氏名";
+
+/**
+ * 名簿と裁量点の表を突き合わせる。
+ *
+ * GPA のファイルと教員ごとの裁量点のファイルは同じ学生を並べたもので、行数も揃う。
+ * 揃っていなければどちらかが古いか、行が消されている。
+ *
+ * 見落とすと痛いのは、教員の表から学生の行ごと消えている場合。点数が空欄なら
+ * 読み取りが止まるが、行が無ければ既定では 0 点として扱われ、その学生はその研究室
+ * では黙って最下位近くに落ちる。
+ */
+function checkRoster(
+  students: readonly Student[],
+  scores: ReadonlyMap<string, Map<StudentId, number>>,
+  sources: ReadonlyMap<string, Set<string>>,
+  warnings: string[]
+): void {
+  const roster = new Set(students.map((student) => student.id));
+
+  for (const [labId, forLab] of scores) {
+    const from = [...(sources.get(labId) ?? [])].join("、") || labId;
+    if (forLab.size === 0) {
+      warnings.push(`${labId} の裁量点がありません（全員 0 点として扱います）`);
+      continue;
+    }
+
+    const missing = [...roster].filter((id) => !forLab.has(id)).sort();
+    if (missing.length > 0) {
+      warnings.push(
+        `${from}: 名簿にいる ${missing.length} 人の点数がありません（${list(missing)}）。` +
+          `行が消えていないか確かめてください`
+      );
+    }
+
+    const extra = [...forLab.keys()].filter((id) => !roster.has(id)).sort();
+    if (extra.length > 0) {
+      warnings.push(
+        `${from}: 名簿に無い ${extra.length} 人の点数があります（${list(extra)}）。無視します`
+      );
+    }
+  }
+}
 
 /** 数が多いときは頭だけ並べる。 */
 function list(ids: readonly StudentId[], limit = 10): string {
