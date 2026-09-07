@@ -28,7 +28,8 @@ export interface PreferenceRow {
 export interface LabRow {
   id: string;
   name?: string;
-  capacity: number;
+  /** 定員。列が無いか空欄なら null。既定値を入れるのは intake.ts の役目。 */
+  capacity: number | null;
   /** eClass の選択肢ラベル。希望順位ファイルの研究室名と突き合わせるのに使う。 */
   label?: string;
 }
@@ -93,10 +94,13 @@ export function parseGpa(text: string): Map<string, number> {
 }
 
 /**
- * `研究室,研究室名,定員` に、任意で `選択肢ラベル` を足したもの。
+ * `研究室` の一覧。`研究室名`・`定員`・`選択肢ラベル` は任意。
  *
  * 選択肢ラベルは eClass の希望順位ファイルが研究室を指す文字列
  * （`○○研究室（○○　○○）` など）。無ければ研究室名か研究室 ID で突き合わせる。
+ *
+ * 定員は無ければ null にしておく。全研究室で無ければ学生数から割り出す
+ * （intake.ts）。
  */
 export function parseLabs(text: string): LabRow[] {
   return withHeader(parseCsv(text))
@@ -108,7 +112,7 @@ export function parseLabs(text: string): LabRow[] {
       return {
         id,
         ...(name === undefined || name === "" ? {} : { name }),
-        capacity: toNumber(pick(row, CAPACITY), `${id} の定員`),
+        capacity: optionalNumber(pick(row, CAPACITY), `${id} の定員`),
         ...(label === undefined || label === "" ? {} : { label }),
       };
     });
@@ -143,6 +147,12 @@ function pick(row: Record<string, string>, aliases: readonly string[]): string |
 function rankOf(key: string): number | null {
   const match = /^第\s*(\d+)\s*希望$/.exec(key) ?? /^希望\s*(\d+)$/.exec(key);
   return match === null ? null : Number(match[1]);
+}
+
+/** 空欄を許す数値。 */
+function optionalNumber(value: string | undefined, what: string): number | null {
+  const text = (value ?? "").replace(/[,\s　]/g, "");
+  return text === "" ? null : toNumber(value, what);
 }
 
 function toNumber(value: string | undefined, what: string): number {
