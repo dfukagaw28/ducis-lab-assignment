@@ -11,7 +11,7 @@
 import { parseCsv, withHeader } from "./csv.js";
 
 const STUDENT_ID = ["学籍番号", "学生番号", "学生id", "学生ID", "id", "ID"];
-const STUDENT_NAME = ["氏名", "名前", "学生名", "name"];
+const STUDENT_NAME = ["氏名", "名前", "学生名", "学生氏名", "name"];
 const LAB_ID = ["研究室", "研究室id", "研究室ID", "研究室記号", "lab", "配属先"];
 const LAB_NAME = ["研究室名", "教員名", "lab name"];
 const CAPACITY = ["定員", "受入人数", "capacity"];
@@ -43,6 +43,8 @@ export interface ScoreRow {
   lab: string;
   student: string;
   score: number;
+  /** 学生氏名の列があれば。希望順位を出していない学生の氏名はここからしか取れない。 */
+  name?: string;
 }
 
 /**
@@ -155,7 +157,13 @@ export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
       if (lab === undefined || lab === "") {
         throw new Error(`${student} の行に研究室の列 (${LAB_ID[0]} か ${TEACHER[0]}) がありません`);
       }
-      return { lab, student, score: toNumber(pick(row, SCORE), `${lab} の ${student} の裁量点`) };
+      const name = pick(row, STUDENT_NAME);
+      return {
+        lab,
+        student,
+        score: toNumber(pick(row, SCORE), `${lab} の ${student} の裁量点`),
+        ...(name === undefined || name === "" ? {} : { name }),
+      };
     });
 }
 
