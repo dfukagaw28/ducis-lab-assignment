@@ -1,7 +1,7 @@
 /**
- * eClass (LMS) が書き出す希望順位ファイルのパーサ。
+ * e-class (LMS) が書き出す希望順位ファイルのパーサ。
  *
- * ファイルの形は DESIGN.md の「eClass の希望順位ファイル」を参照。ここでは
+ * ファイルの形は DESIGN.md の「e-class の希望順位ファイル」を参照。ここでは
  * 構造を切り分けるところまでを用意してあり、中身の読み取り
  * (`parseOptionLabels` と `parseUserAnswers`) はこれから書く。
  *

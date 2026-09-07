@@ -98,6 +98,8 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
   const scores = new Map<string, Map<StudentId, number>>(
     labRows.map((row) => [row.id, new Map<StudentId, number>()])
   );
+  // 希望順位を出していない学生の氏名は、裁量点の表からしか取れない
+  const namesFromScores = new Map<StudentId, string>();
   for (const file of scoreFiles) {
     for (const row of inFile(file, () => parseScoreRows(rowsOf(file)))) {
       // 研究室 ID でも、研究室名でも、教員氏名でも引ける
@@ -112,6 +114,7 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
         warnings.push(`${file.name}: ${row.lab} の ${row.student} の裁量点が重複しています`);
       }
       forLab.set(row.student, row.score);
+      if (row.name !== undefined) namesFromScores.set(row.student, row.name);
     }
   }
 
@@ -146,9 +149,24 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
     };
   });
 
+  // 希望順位を出していない学生も配属の対象にする。順位を一つも付けていない扱いに
+  // なるので、全研究室がランダムな順になる（domain/preferences.ts）。
   const ranked = new Set(students.map((student) => student.id));
-  for (const id of gpa.keys()) {
-    if (!ranked.has(id)) warnings.push(`${id} は GPA にあるが希望順位に無い（無視します）`);
+  const absent = [...gpa.keys()].filter((id) => !ranked.has(id)).sort();
+  for (const id of absent) {
+    const name = namesFromScores.get(id);
+    students.push({
+      id,
+      ...(name === undefined ? {} : { name }),
+      gpa: gpa.get(id)!,
+      preferences: [],
+    });
+  }
+  if (absent.length > 0) {
+    warnings.push(
+      `${absent.length} 人が希望順位を出していません（${list(absent)}）。` +
+        `全研究室をランダムな順として扱います`
+    );
   }
 
   const capacities = resolveCapacities(labRows, students, seed, warnings);
@@ -218,6 +236,13 @@ function resolveCapacities(
 /** 研究室一覧 CSV の列の見出し（エラーで案内するため）。 */
 const LABEL_COLUMN = "選択肢ラベル";
 const TEACHER_COLUMN = "教員氏名";
+
+/** 数が多いときは頭だけ並べる。 */
+function list(ids: readonly StudentId[], limit = 10): string {
+  return ids.length <= limit
+    ? ids.join("、")
+    : `${ids.slice(0, limit).join("、")} ほか ${ids.length - limit} 人`;
+}
 
 /** Excel から来たならそのシート、CSV なら中身を読んで、行と列にする。 */
 function rowsOf(file: SourceFile): string[][] {

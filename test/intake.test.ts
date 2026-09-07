@@ -147,7 +147,9 @@ describe("buildInstance（eClass のファイルから）", () => {
 
   it("暫定 CSV でなくても、そうと見分けて読む", () => {
     const { instance } = buildInstance(eclassFiles, SEED);
-    expect(instance.students).toHaveLength(9);
+    // 回答したのは 9 人。名簿（GPA）にはもう 1 人いる
+    expect(instance.students.filter((student) => student.preferences.length > 0)).toHaveLength(8);
+    expect(instance.students).toHaveLength(10);
     expect(instance.labs).toHaveLength(4);
   });
 
@@ -163,6 +165,31 @@ describe("buildInstance（eClass のファイルから）", () => {
     const { instance } = buildInstance(eclassFiles, SEED);
     const blank = instance.students.find((student) => student.id === "1234560005")!;
     expect(blank.preferences).toEqual([]);
+  });
+
+  it("希望順位を出していない学生も、希望なしとして配属の対象にする", () => {
+    const { instance, warnings } = buildInstance(eclassFiles, SEED);
+    // 回答したのは 9 人、GPA には 10 人いる
+    expect(instance.students).toHaveLength(10);
+    const absent = instance.students.find((student) => student.id === "1234560007")!;
+    expect(absent.preferences).toEqual([]);
+    expect(absent.gpa).toBe(3.21);
+    expect(warnings.join()).toMatch(/1 人が希望順位を出していません（1234560007）/);
+  });
+
+  it("希望順位を出していない学生の氏名を裁量点の表から取る", () => {
+    const withExcel: SourceFile[] = [
+      ...eclassFiles.filter((file) => file.role !== "scores"),
+      {
+        name: "教員裁量点_○○先生.xlsx",
+        role: "scores",
+        text: "",
+        rows: sheetRows("教員裁量点_○○先生.xlsx"),
+      },
+    ];
+    const { instance } = buildInstance(withExcel, SEED);
+    const absent = instance.students.find((student) => student.id === "1234560007")!;
+    expect(absent.name).toBe("鈴木 サンプル");
   });
 
   it("選択肢ラベルの列が無ければ研究室名で突き合わせる", () => {
@@ -204,10 +231,10 @@ describe("buildInstance（eClass のファイルから）", () => {
     const { instance, warnings } = buildInstance(noCapacity, SEED);
     const seats = instance.labs.map((lab) => lab.capacity);
 
-    // 学生 9 人 ÷ 研究室 4 室 = 2 余り 1。1 室だけ 3 人になる
+    // 学生 10 人 ÷ 研究室 4 室 = 2 余り 2。2 室が 3 人になる
     expect(seats.reduce((a, b) => a + b, 0)).toBe(instance.students.length);
-    expect(seats.filter((n) => n === 3)).toHaveLength(1);
-    expect(seats.filter((n) => n === 2)).toHaveLength(3);
+    expect(seats.filter((n) => n === 3)).toHaveLength(2);
+    expect(seats.filter((n) => n === 2)).toHaveLength(2);
     expect(warnings.join()).toMatch(/希望の多い .* は \+1 人/);
   });
 
