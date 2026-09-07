@@ -7,6 +7,7 @@
  */
 
 import { Pcg32Rng, permutation } from "hospital-resident-matching";
+import { STREAM, streamSeed } from "./streams.js";
 import type { StudentId } from "./types.js";
 
 /** 学生ごとの抽選番号。0 が最も優先される。 */
@@ -22,7 +23,7 @@ export function drawLottery(
     }
   }
 
-  const order = permutation(new Pcg32Rng(seed), sorted.length);
+  const order = permutation(new Pcg32Rng(streamSeed(seed, STREAM.lottery)), sorted.length);
   const lottery = new Map<StudentId, number>();
   order.forEach((index, number) => lottery.set(sorted[index]!, number));
   return lottery;

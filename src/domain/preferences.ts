@@ -33,15 +33,8 @@
 
 import { Pcg32Rng, permutation } from "hospital-resident-matching";
 
+import { STREAM, streamSeed } from "./streams.js";
 import type { Lab, LabId, Student, StudentId } from "./types.js";
-
-/**
- * 補完に使う乱数の種を、抽選の種からずらす幅。
- *
- * 同じ種から二つの流れを引くと、抽選の結果と補完の結果が同じ乱数列を辿ることに
- * なるので、別の流れにしておく。
- */
-const STREAM_OFFSET = 1;
 
 /**
  * 学生ごとに、順位を付けなかった研究室をランダムに並べたもの。
@@ -53,7 +46,7 @@ export function drawPreferenceRest(
   labs: readonly Lab[],
   seed: number
 ): Map<StudentId, LabId[]> {
-  const rng = new Pcg32Rng(seed + STREAM_OFFSET);
+  const rng = new Pcg32Rng(streamSeed(seed, STREAM.preferenceRest));
   const labIds = labs.map((lab) => lab.id).sort(compare);
 
   const drawn = new Map<StudentId, LabId[]>();
