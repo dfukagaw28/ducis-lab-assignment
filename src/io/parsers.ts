@@ -15,6 +15,7 @@ const STUDENT_NAME = ["氏名", "名前", "学生名", "name"];
 const LAB_ID = ["研究室", "研究室id", "研究室ID", "研究室記号", "lab", "配属先"];
 const LAB_NAME = ["研究室名", "教員名", "lab name"];
 const CAPACITY = ["定員", "受入人数", "capacity"];
+const OPTION_LABEL = ["選択肢ラベル", "eclass", "eclassラベル", "ラベル", "選択肢"];
 const GPA = ["gpa", "GPA", "成績", "評点"];
 const SCORE = ["裁量点", "点数", "得点", "評価点", "score"];
 
@@ -28,6 +29,8 @@ export interface LabRow {
   id: string;
   name?: string;
   capacity: number;
+  /** eClass の選択肢ラベル。希望順位ファイルの研究室名と突き合わせるのに使う。 */
+  label?: string;
 }
 
 export interface ScoreRow {
@@ -89,17 +92,24 @@ export function parseGpa(text: string): Map<string, number> {
   return gpa;
 }
 
-/** `研究室,研究室名,定員` */
+/**
+ * `研究室,研究室名,定員` に、任意で `選択肢ラベル` を足したもの。
+ *
+ * 選択肢ラベルは eClass の希望順位ファイルが研究室を指す文字列
+ * （`○○研究室（○○　○○）` など）。無ければ研究室名か研究室 ID で突き合わせる。
+ */
 export function parseLabs(text: string): LabRow[] {
   return withHeader(parseCsv(text))
     .filter((row) => (pick(row, LAB_ID) ?? "") !== "")
     .map((row) => {
       const id = pick(row, LAB_ID)!;
       const name = pick(row, LAB_NAME);
+      const label = pick(row, OPTION_LABEL);
       return {
         id,
         ...(name === undefined || name === "" ? {} : { name }),
         capacity: toNumber(pick(row, CAPACITY), `${id} の定員`),
+        ...(label === undefined || label === "" ? {} : { label }),
       };
     });
 }
