@@ -1,5 +1,6 @@
 /** 配属結果の集計と、安定性の自己検査。 */
 
+import { completedPreferences } from "./preferences.js";
 import type { Assignment } from "./solve.js";
 import type { Instance, LabId, StudentId } from "./types.js";
 
@@ -133,7 +134,10 @@ export function findBlockingPairs(
   const pairs: BlockingPair[] = [];
 
   for (const student of instance.students) {
-    const preferences = assignment.completed.get(student.id) ?? student.preferences;
+    const preferences = completedPreferences(
+      student.preferences,
+      assignment.preferenceRest.get(student.id)
+    );
     const current = assignment.studentToLab.get(student.id);
     // 未配属ならどの希望も今より良い
     const currentChoice =

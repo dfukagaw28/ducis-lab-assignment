@@ -70,9 +70,9 @@ describe("findBlockingPairs", () => {
         ["s1", 0],
         ["s2", 1],
       ]),
-      completed: new Map([
-        ["s1", ["X", "Y"]],
-        ["s2", ["X", "Y"]],
+      preferenceRest: new Map([
+        ["s1", []],
+        ["s2", []],
       ]),
       rankings,
     };
