@@ -86,8 +86,18 @@ let latest: { instance: Instance; report: Report; params: Params } | null = null
 let sample: Instance | null = null;
 
 dropZone.onChange(() => {
+  // 入力が変わった時点で、表示中の結果は前の入力のもの。残すと、いま入れた
+  // ファイルの結果だと思って読まれるし、ダウンロードもそちらを書き出す。
   sample = null;
+  clear();
 });
+
+function clear(): void {
+  latest = null;
+  output.innerHTML = "";
+  warningBox.hidden = true;
+  errorBox.hidden = true;
+}
 
 app.querySelector<HTMLButtonElement>("#useSample")!.addEventListener("click", () => {
   sample = sampleInstance({ numStudents: 150, numLabs: 10, seed: 4242 });
@@ -129,6 +139,13 @@ function readParams(): Params {
   };
 }
 
+/** 何から出した結果なのかを、結果と一緒に出すための一行。 */
+function source(files: readonly { name: string }[]): string {
+  return sample === null
+    ? files.map((file) => file.name).join("、")
+    : "サンプルデータ（合成、実ファイルではありません）";
+}
+
 function run(): void {
   errorBox.hidden = true;
   try {
@@ -144,7 +161,7 @@ function run(): void {
 
     latest = { instance: built.instance, report, params };
     renderMessages(warningBox, built.warnings);
-    renderReport(output, built.instance, report);
+    renderReport(output, built.instance, report, source(files));
   } catch (cause) {
     latest = null;
     output.innerHTML = "";

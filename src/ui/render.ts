@@ -4,7 +4,13 @@ import type { Report } from "../domain/report.js";
 import type { Instance } from "../domain/types.js";
 import { escapeHtml } from "./dropzone.js";
 
-export function renderReport(root: HTMLElement, instance: Instance, report: Report): void {
+export function renderReport(
+  root: HTMLElement,
+  instance: Instance,
+  report: Report,
+  /** 何から出した結果なのか。取り違えに気づけるよう、結果と一緒に出す。 */
+  source: string
+): void {
   const { summary } = report;
   const labName = new Map(instance.labs.map((lab) => [lab.id, lab.name ?? lab.id]));
 
@@ -63,6 +69,7 @@ export function renderReport(root: HTMLElement, instance: Instance, report: Repo
 
   root.innerHTML = `
     <h2>結果</h2>
+    <p class="source">入力: ${escapeHtml(source)}</p>
     <dl class="stats">
       <div><dt>抽選シード</dt><dd><code>${summary.seed}</code></dd></div>
       <div><dt>学生</dt><dd>${summary.numStudents} 人</dd></div>
