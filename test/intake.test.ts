@@ -1,11 +1,14 @@
+// @vitest-environment jsdom
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildInstance, guessRole, type SourceFile } from "../src/io/intake.js";
+import { readWorkbook, sheetOf } from "../src/io/xlsx.js";
 import { parsePreferences } from "../src/io/parsers.js";
 
 function sample(name: string, role: SourceFile["role"]): SourceFile {
-  return { name, role, text: readFileSync(new URL(`../samples/${name}`, import.meta.url), "utf8") };
+  return { name, role, text: readFileSync(resolve("samples", name), "utf8") };
 }
 
 const files: SourceFile[] = [
@@ -19,6 +22,13 @@ const files: SourceFile[] = [
 ];
 
 const SEED = 20260907;
+
+/** Excel のシートを行と列にして返す（ドロップゾーンがするのと同じこと）。 */
+function sheetRows(name: string): string[][] {
+  const bytes = new Uint8Array(readFileSync(resolve("samples", name)));
+  const workbook = readWorkbook(bytes);
+  return sheetOf(workbook, "教員裁量点").rows;
+}
 
 describe("guessRole", () => {
   it("ファイル名から種類を当てる", () => {
@@ -160,10 +170,10 @@ describe("buildInstance（eClass のファイルから）", () => {
       file.role === "labs"
         ? {
             ...file,
-            // 選択肢ラベルの列を落とし、研究室名をラベルと同じにする
+            // 選択肢ラベルと教員氏名の列を落とし、研究室名をラベルと同じにする
             text: file.text
-              .replace("研究室,研究室名,定員,選択肢ラベル", "研究室,研究室名,定員")
-              .replace(/^(L\d+),[^,]*,(\d+),(.*)$/gm, "$1,$3,$2"),
+              .replace("研究室,研究室名,定員,選択肢ラベル,教員氏名", "研究室,研究室名,定員")
+              .replace(/^(L\d+),[^,]*,(\d+),([^,]*),.*$/gm, "$1,$3,$2"),
           }
         : file
     );
@@ -199,6 +209,43 @@ describe("buildInstance（eClass のファイルから）", () => {
     expect(seats.filter((n) => n === 3)).toHaveLength(1);
     expect(seats.filter((n) => n === 2)).toHaveLength(3);
     expect(warnings.join()).toMatch(/希望の多い .* は \+1 人/);
+  });
+
+  it("教員ごとの Excel を、教員氏名で研究室に結びつける", () => {
+    const withExcel: SourceFile[] = [
+      ...eclassFiles.filter((file) => file.role !== "scores"),
+      ...["○○", "△△", "□□", "◇◇"].map((teacher) => ({
+        name: `教員裁量点_${teacher}先生.xlsx`,
+        role: "scores" as const,
+        text: "",
+        rows: sheetRows(`教員裁量点_${teacher}先生.xlsx`),
+      })),
+    ];
+    const { instance } = buildInstance(withExcel, SEED);
+    const lab = instance.labs.find((entry) => entry.id === "L01")!;
+    // テンプレートは 10 人ぶんあり、回答したのは 9 人
+    expect(lab.scores.size).toBe(10);
+    expect(lab.scores.get("1234560002")).toBeGreaterThanOrEqual(0);
+  });
+
+  it("教員氏名が研究室一覧に無ければ、入れるべき列を言って止まる", () => {
+    const noTeacher = [
+      ...eclassFiles.filter((file) => file.role !== "scores" && file.role !== "labs"),
+      {
+        ...eclassFiles.find((file) => file.role === "labs")!,
+        text: eclassFiles
+          .find((file) => file.role === "labs")!
+          .text.replace(",教員氏名", "")
+          .replace(/,[^,]*$/gm, ""),
+      },
+      {
+        name: "教員裁量点_○○先生.xlsx",
+        role: "scores" as const,
+        text: "",
+        rows: sheetRows("教員裁量点_○○先生.xlsx"),
+      },
+    ];
+    expect(() => buildInstance(noTeacher, SEED)).toThrow(/教員氏名/);
   });
 
   it("突き合わせられない研究室があれば、その名前を言って止まる", () => {

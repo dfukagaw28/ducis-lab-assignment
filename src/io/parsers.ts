@@ -17,7 +17,10 @@ const LAB_NAME = ["研究室名", "教員名", "lab name"];
 const CAPACITY = ["定員", "受入人数", "capacity"];
 const OPTION_LABEL = ["選択肢ラベル", "eclass", "eclassラベル", "ラベル", "選択肢"];
 const GPA = ["gpa", "GPA", "成績", "評点"];
-const SCORE = ["裁量点", "点数", "得点", "評価点", "score"];
+const SCORE = ["裁量点", "教員裁量点", "点数", "得点", "評価点", "score"];
+const TEACHER = ["教員氏名", "担当教員", "教員", "教員名"];
+/** 裁量点の表で研究室を指す列。教員ごとの Excel は教員氏名で研究室を表す。 */
+const SCORE_LAB = [...LAB_ID, ...TEACHER];
 
 export interface PreferenceRow {
   id: string;
@@ -32,6 +35,8 @@ export interface LabRow {
   capacity: number | null;
   /** eClass の選択肢ラベル。希望順位ファイルの研究室名と突き合わせるのに使う。 */
   label?: string;
+  /** 教員氏名。教員ごとの裁量点ファイルと突き合わせるのに使う。 */
+  teacher?: string;
 }
 
 export interface ScoreRow {
@@ -47,7 +52,10 @@ export interface ScoreRow {
  * 学籍番号と氏名を除いた残りの列を左から順に希望とみなす。
  */
 export function parsePreferences(text: string): PreferenceRow[] {
-  const rows = parseCsv(text);
+  return parsePreferenceRows(parseCsv(text));
+}
+
+export function parsePreferenceRows(rows: readonly string[][]): PreferenceRow[] {
   const header = rows[0];
   if (header === undefined) throw new Error("空のファイルです");
 
@@ -83,8 +91,12 @@ export function parsePreferences(text: string): PreferenceRow[] {
 
 /** `学籍番号,GPA` */
 export function parseGpa(text: string): Map<string, number> {
+  return parseGpaRows(parseCsv(text));
+}
+
+export function parseGpaRows(rows: readonly string[][]): Map<string, number> {
   const gpa = new Map<string, number>();
-  for (const row of withHeader(parseCsv(text))) {
+  for (const row of withHeader(rows)) {
     const id = pick(row, STUDENT_ID);
     if (id === undefined || id === "") continue;
     if (gpa.has(id)) throw new Error(`学籍番号 ${id} が重複しています`);
@@ -103,30 +115,45 @@ export function parseGpa(text: string): Map<string, number> {
  * （intake.ts）。
  */
 export function parseLabs(text: string): LabRow[] {
-  return withHeader(parseCsv(text))
+  return parseLabRows(parseCsv(text));
+}
+
+export function parseLabRows(rows: readonly string[][]): LabRow[] {
+  return withHeader(rows)
     .filter((row) => (pick(row, LAB_ID) ?? "") !== "")
     .map((row) => {
       const id = pick(row, LAB_ID)!;
       const name = pick(row, LAB_NAME);
       const label = pick(row, OPTION_LABEL);
+      const teacher = pick(row, TEACHER);
       return {
         id,
         ...(name === undefined || name === "" ? {} : { name }),
         capacity: optionalNumber(pick(row, CAPACITY), `${id} の定員`),
         ...(label === undefined || label === "" ? {} : { label }),
+        ...(teacher === undefined || teacher === "" ? {} : { teacher }),
       };
     });
 }
 
-/** `研究室,学籍番号,裁量点`。研究室ごとのファイルでも、まとめた一枚でもよい。 */
+/**
+ * `研究室,学籍番号,裁量点`。研究室ごとのファイルでも、まとめた一枚でもよい。
+ *
+ * 教員ごとの Excel（`学生ID,学生氏名,教員氏名,教員裁量点`）も同じ形として読める。
+ * 研究室を指すのが研究室 ID か教員氏名かの違いで、どちらも研究室一覧で引ける。
+ */
 export function parseScores(text: string): ScoreRow[] {
-  return withHeader(parseCsv(text))
+  return parseScoreRows(parseCsv(text));
+}
+
+export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
+  return withHeader(rows)
     .filter((row) => (pick(row, STUDENT_ID) ?? "") !== "")
     .map((row) => {
-      const lab = pick(row, LAB_ID);
+      const lab = pick(row, SCORE_LAB);
       const student = pick(row, STUDENT_ID)!;
       if (lab === undefined || lab === "") {
-        throw new Error(`${student} の行に研究室の列 (${LAB_ID[0]}) がありません`);
+        throw new Error(`${student} の行に研究室の列 (${LAB_ID[0]} か ${TEACHER[0]}) がありません`);
       }
       return { lab, student, score: toNumber(pick(row, SCORE), `${lab} の ${student} の裁量点`) };
     });

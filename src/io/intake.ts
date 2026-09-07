@@ -7,8 +7,15 @@
 
 import { tightCapacities } from "../domain/capacity.js";
 import type { Instance, Lab, LabId, Student, StudentId } from "../domain/types.js";
+import { parseCsv } from "./csv.js";
 import { looksLikeEclass, parseEclassPreferences } from "./eclass.js";
-import { parseGpa, parseLabs, parsePreferences, parseScores, type LabRow } from "./parsers.js";
+import {
+  parseGpaRows,
+  parseLabRows,
+  parsePreferenceRows,
+  parseScoreRows,
+  type LabRow,
+} from "./parsers.js";
 
 export const ROLES = ["preferences", "gpa", "labs", "scores"] as const;
 export type FileRole = (typeof ROLES)[number];
@@ -23,7 +30,13 @@ export const ROLE_LABELS: Record<FileRole, string> = {
 export interface SourceFile {
   name: string;
   role: FileRole;
+  /** CSV やテキストとして読んだ中身。Excel から来たものは空。 */
   text: string;
+  /**
+   * Excel のシートを行と列にしたもの。CSV なら未設定で、`text` から起こす。
+   * どちらから来ても、以降の読み取りは行と列に対して同じように行う。
+   */
+  rows?: string[][];
 }
 
 export interface Built {
@@ -58,11 +71,17 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
   };
 
   const preferenceFile = only("preferences");
-  const preferenceRows = inFile(preferenceFile, (text) =>
-    looksLikeEclass(text) ? parseEclassPreferences(text) : parsePreferences(text)
+  const preferenceRows = inFile(preferenceFile, () =>
+    preferenceFile.rows === undefined && looksLikeEclass(preferenceFile.text)
+      ? parseEclassPreferences(preferenceFile.text)
+      : parsePreferenceRows(rowsOf(preferenceFile))
   );
-  const gpa = inFile(only("gpa"), parseGpa);
-  const labRows = inFile(only("labs"), parseLabs);
+
+  const gpaFile = only("gpa");
+  const gpa = inFile(gpaFile, () => parseGpaRows(rowsOf(gpaFile)));
+
+  const labFile = only("labs");
+  const labRows = inFile(labFile, () => parseLabRows(rowsOf(labFile)));
 
   const scoreFiles = files.filter((file) => file.role === "scores");
   if (scoreFiles.length === 0) throw new Error("教員裁量点のファイルがありません");
@@ -80,10 +99,14 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
     labRows.map((row) => [row.id, new Map<StudentId, number>()])
   );
   for (const file of scoreFiles) {
-    for (const row of inFile(file, parseScores)) {
-      const forLab = scores.get(row.lab);
+    for (const row of inFile(file, () => parseScoreRows(rowsOf(file)))) {
+      // 研究室 ID でも、研究室名でも、教員氏名でも引ける
+      const forLab = scores.get(byAnyName.get(matchKey(row.lab)) ?? "");
       if (forLab === undefined) {
-        throw new Error(`${file.name}: 研究室一覧に無い研究室 ${row.lab} があります`);
+        throw new Error(
+          `${file.name}: 「${row.lab}」が研究室一覧に見つかりません。` +
+            `研究室一覧の「${TEACHER_COLUMN}」列に、裁量点ファイルの教員氏名を入れてください`
+        );
       }
       if (forLab.has(row.student)) {
         warnings.push(`${file.name}: ${row.lab} の ${row.student} の裁量点が重複しています`);
@@ -192,15 +215,22 @@ function resolveCapacities(
   return capacities;
 }
 
-/** 研究室一覧 CSV の、選択肢ラベルの列の見出し（エラーで案内するため）。 */
+/** 研究室一覧 CSV の列の見出し（エラーで案内するため）。 */
 const LABEL_COLUMN = "選択肢ラベル";
+const TEACHER_COLUMN = "教員氏名";
+
+/** Excel から来たならそのシート、CSV なら中身を読んで、行と列にする。 */
+function rowsOf(file: SourceFile): string[][] {
+  return file.rows ?? parseCsv(file.text);
+}
 
 /**
  * 研究室を、選択肢ラベル・研究室名・研究室 ID のどれからでも引けるようにする。
  *
  * eClass の希望順位ファイルは研究室を `○○研究室（○○　○○）` のような表示名で
- * 指すのに対し、研究室一覧は `L01` のような ID で持っている。突き合わせるのが
- * 選択肢ラベルの列で、無ければ研究室名か ID がそのまま使われている場合に備える。
+ * 指し、教員ごとの裁量点ファイルは教員氏名で指すのに対し、研究室一覧は `L01` の
+ * ような ID で持っている。突き合わせるのが選択肢ラベルと教員氏名の列で、無ければ
+ * 研究室名か ID がそのまま使われている場合に備える。
  */
 function labLookup(labRows: readonly LabRow[]): Map<string, LabId> {
   const lookup = new Map<string, LabId>();
@@ -218,6 +248,7 @@ function labLookup(labRows: readonly LabRow[]): Map<string, LabId> {
     add(row.id, row.id);
     add(row.name, row.id);
     add(row.label, row.id);
+    add(row.teacher, row.id);
   }
   return lookup;
 }
@@ -228,9 +259,9 @@ function matchKey(name: string): string {
 }
 
 /** パーサの投げるエラーに、どのファイルで起きたのかを添える。 */
-function inFile<T>(file: SourceFile, parse: (text: string) => T): T {
+function inFile<T>(file: SourceFile, parse: () => T): T {
   try {
-    return parse(file.text);
+    return parse();
   } catch (error) {
     throw new Error(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
   }
