@@ -5,6 +5,7 @@
  * 実ファイルのパーサ (M3) が入っても、変わるのは parse の中身だけ。
  */
 
+import { tightCapacities } from "../domain/capacity.js";
 import type { Instance, Lab, LabId, Student, StudentId } from "../domain/types.js";
 import { looksLikeEclass, parseEclassPreferences } from "./eclass.js";
 import { parseGpa, parseLabs, parsePreferences, parseScores, type LabRow } from "./parsers.js";
@@ -41,7 +42,12 @@ export function guessRole(fileName: string): FileRole {
   return "scores";
 }
 
-export function buildInstance(files: readonly SourceFile[]): Built {
+/**
+ * 読み込んだファイルからインスタンスを組み立てる。
+ *
+ * `seed` は定員の指定が無いときの割り当てに使う（余りの席をどの研究室に渡すか）。
+ */
+export function buildInstance(files: readonly SourceFile[], seed: number): Built {
   const only = (role: FileRole): SourceFile => {
     const found = files.filter((file) => file.role === role);
     if (found.length === 0) throw new Error(`${ROLE_LABELS[role]}のファイルがありません`);
@@ -122,7 +128,7 @@ export function buildInstance(files: readonly SourceFile[]): Built {
     if (!ranked.has(id)) warnings.push(`${id} は GPA にあるが希望順位に無い（無視します）`);
   }
 
-  const capacities = resolveCapacities(labRows, students.length, warnings);
+  const capacities = resolveCapacities(labRows, students, seed, warnings);
   const labs: Lab[] = labRows.map((row) => ({
     id: row.id,
     ...(row.name === undefined ? {} : { name: row.name }),
@@ -144,13 +150,14 @@ export function buildInstance(files: readonly SourceFile[]): Built {
 /**
  * 定員を決める。
  *
- * 定員の列が無ければ、学生数を研究室数で割った切り上げを全研究室に入れる。合計が
- * 学生数以上になるので誰も溢れないが、それは運用上の決定を勝手にしたということ
- * なので警告する。一部の研究室だけ空欄なのは書き忘れとみなして止める。
+ * 定員の列が無ければ、合計がちょうど学生数になるように割り当てる（`tightCapacities`）。
+ * 運用上の決定を勝手にしたということなので、どう決めたかを警告に出す。一部の研究室
+ * だけ空欄なのは書き忘れとみなして止める。
  */
 function resolveCapacities(
   labRows: readonly LabRow[],
-  numStudents: number,
+  students: readonly Student[],
+  seed: number,
   warnings: string[]
 ): Map<LabId, number> {
   const missing = labRows.filter((row) => row.capacity === null);
@@ -166,12 +173,23 @@ function resolveCapacities(
     );
   }
 
-  const even = Math.ceil(numStudents / labRows.length);
-  warnings.push(
-    `定員の指定が無いので、全研究室を ${even} 人（学生 ${numStudents} 人 ÷ ` +
-      `研究室 ${labRows.length} 室 の切り上げ）としました`
+  const capacities = tightCapacities(
+    students,
+    labRows.map((row) => row.id),
+    seed
   );
-  return new Map(labRows.map((row) => [row.id, even]));
+  const base = Math.floor(students.length / labRows.length);
+  const extra = [...capacities]
+    .filter(([, seats]) => seats > base)
+    .map(([id]) => id)
+    .sort();
+
+  warnings.push(
+    `定員の指定が無いので、合計がちょうど学生数（${students.length} 人）になるように` +
+      `割り当てました: 各研究室 ${base} 人` +
+      (extra.length === 0 ? "" : `、希望の多い ${extra.join("、")} は +1 人`)
+  );
+  return capacities;
 }
 
 /** 研究室一覧 CSV の、選択肢ラベルの列の見出し（エラーで案内するため）。 */

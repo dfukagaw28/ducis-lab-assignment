@@ -24,8 +24,9 @@ const files: SourceFile[] = names.map(([name, role]) => ({
   text: readFileSync(new URL(`../samples/${name}`, import.meta.url), "utf8"),
 }));
 
-const params: Params = { ...defaultParams, seed: 20260906 };
-const { instance } = buildInstance(files);
+const SEED = 20260906;
+const params: Params = { ...defaultParams, seed: SEED };
+const { instance } = buildInstance(files, SEED);
 const report = buildReport(instance, assign(instance, params));
 
 describe("studentsCsv", () => {

@@ -137,8 +137,9 @@ function run(): void {
       throw new Error("入力ファイルを読み込むか、サンプルデータを使ってください");
     }
 
-    const built = sample === null ? buildInstance(files) : { instance: sample, warnings: [] };
     const params = readParams();
+    const built =
+      sample === null ? buildInstance(files, params.seed) : { instance: sample, warnings: [] };
     const report = buildReport(built.instance, assign(built.instance, params));
 
     latest = { instance: built.instance, report, params };
