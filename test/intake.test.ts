@@ -4,31 +4,81 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildInstance, guessRole, type SourceFile } from "../src/io/intake.js";
-import { readWorkbook, sheetOf } from "../src/io/xlsx.js";
 import { parsePreferences } from "../src/io/parsers.js";
-
-function sample(name: string, role: SourceFile["role"]): SourceFile {
-  return { name, role, text: readFileSync(resolve("samples", name), "utf8") };
-}
-
-const files: SourceFile[] = [
-  sample("preferences.csv", "preferences"),
-  sample("gpa.csv", "gpa"),
-  sample("labs.csv", "labs"),
-  sample("scores_L01.csv", "scores"),
-  sample("scores_L02.csv", "scores"),
-  sample("scores_L03.csv", "scores"),
-  sample("scores_L04.csv", "scores"),
-];
+import { readWorkbook, sheetOf } from "../src/io/xlsx.js";
 
 const SEED = 20260907;
 
 /** Excel のシートを行と列にして返す（ドロップゾーンがするのと同じこと）。 */
-function sheetRows(name: string): string[][] {
+function sheetRows(name: string, sheet: string): string[][] {
   const bytes = new Uint8Array(readFileSync(resolve("samples", name)));
-  const workbook = readWorkbook(bytes);
-  return sheetOf(workbook, "教員裁量点").rows;
+  return sheetOf(readWorkbook(bytes), sheet).rows;
 }
+
+function fromSamples(name: string, role: SourceFile["role"]): SourceFile {
+  return { name, role, text: readFileSync(resolve("samples", name), "utf8") };
+}
+
+function scoreSheet(teacher: string): SourceFile {
+  const name = `教員裁量点_${teacher}先生.xlsx`;
+  return { name, role: "scores", text: "", rows: sheetRows(name, "教員裁量点") };
+}
+
+/**
+ * 暫定 CSV 形式の一式。samples/ には eClass と Excel の見本しか置いていないので、
+ * この形式の確かめはここで組み立てる。
+ */
+const csvFiles: SourceFile[] = [
+  {
+    name: "preferences.csv",
+    role: "preferences",
+    text: [
+      "学籍番号,氏名,第1希望,第2希望,第3希望,第4希望",
+      "S001,学生01,L01,L04,L02,L03",
+      "S002,学生02,L03,L02,L04,L01",
+      "S003,学生03,L02,L03,L04,L01",
+      "S004,学生04,L01,L02,L04,L03",
+      "S005,学生05,L04,L03,L01,L02",
+      "S006,学生06,L02,L03,L04,L01",
+      "S007,学生07,L03,L01,L02,L04",
+      "S008,学生08,L04,L03,L02,L01",
+      "S009,学生09,L04,L03,L02,L01",
+      "S010,学生10,L04,L02,L03,L01",
+      "S011,学生11,L03,L02,L01,L04",
+      "S012,学生12,L04,L03,L01,L02",
+    ].join("\n"),
+  },
+  {
+    name: "gpa.csv",
+    role: "gpa",
+    text: ["学籍番号,GPA"]
+      .concat(
+        Array.from({ length: 12 }, (_, i) => `S${String(i + 1).padStart(3, "0")},${2 + (i % 5) * 0.4}`)
+      )
+      .join("\n"),
+  },
+  fromSamples("labs.csv", "labs"),
+  ...["L01", "L02", "L03", "L04"].map((lab, index) => ({
+    name: `scores_${lab}.csv`,
+    role: "scores" as const,
+    text: ["研究室,学籍番号,裁量点"]
+      .concat(
+        Array.from(
+          { length: 12 },
+          (_, i) => `${lab},S${String(i + 1).padStart(3, "0")},${(i * 7 + index * 13) % 61}`
+        )
+      )
+      .join("\n"),
+  })),
+];
+
+/** eClass の書き出しと Excel の一式（samples/ にあるもの）。 */
+const eclassFiles: SourceFile[] = [
+  fromSamples("answer-utf8-sample.txt", "preferences"),
+  { name: "GPA.xlsx", role: "gpa", text: "", rows: sheetRows("GPA.xlsx", "GPA") },
+  fromSamples("eclass-labs.csv", "labs"),
+  ...["○○", "△△", "□□", "◇◇"].map(scoreSheet),
+];
 
 describe("guessRole", () => {
   it("ファイル名から種類を当てる", () => {
@@ -46,7 +96,7 @@ describe("guessRole", () => {
 
 describe("buildInstance", () => {
   it("サンプル一式を読み込む", () => {
-    const { instance, warnings } = buildInstance(files, SEED);
+    const { instance, warnings } = buildInstance(csvFiles, SEED);
     expect(instance.students).toHaveLength(12);
     expect(instance.labs).toHaveLength(4);
     expect(warnings).toEqual([]);
@@ -55,30 +105,31 @@ describe("buildInstance", () => {
     expect(first.id).toBe("S001");
     expect(first.name).toBe("学生01");
     expect(first.preferences).toEqual(["L01", "L04", "L02", "L03"]);
-    expect(first.gpa).toBe(1.9);
+    expect(first.gpa).toBe(2);
 
     const lab = instance.labs.find((entry) => entry.id === "L01")!;
     expect(lab.name).toBe("情報数理");
     expect(lab.capacity).toBe(3);
-    expect(lab.scores.get("S001")).toBe(12);
+    expect(lab.scores.get("S001")).toBe(0);
+    expect(lab.scores.get("S002")).toBe(7);
   });
 
   it("研究室ごとの裁量点ファイルをまとめて受ける", () => {
-    const { instance } = buildInstance(files, SEED);
+    const { instance } = buildInstance(csvFiles, SEED);
     for (const lab of instance.labs) expect(lab.scores.size).toBe(12);
   });
 
   it("足りないファイルを教える", () => {
-    expect(() => buildInstance(files.filter((file) => file.role !== "gpa"), SEED)).toThrow(/GPA/);
-    expect(() => buildInstance(files.filter((file) => file.role !== "scores"), SEED)).toThrow(/裁量点/);
+    expect(() => buildInstance(csvFiles.filter((file) => file.role !== "gpa"), SEED)).toThrow(/GPA/);
+    expect(() => buildInstance(csvFiles.filter((file) => file.role !== "scores"), SEED)).toThrow(/裁量点/);
   });
 
   it("同じ種類が二つあれば拒む", () => {
-    expect(() => buildInstance([...files, sample("gpa.csv", "gpa")], SEED)).toThrow(/2 個/);
+    expect(() => buildInstance([...csvFiles, csvFiles.find((file) => file.role === "gpa")!], SEED)).toThrow(/2 個/);
   });
 
   it("研究室一覧に無い研究室を希望していれば、その旨を伝えて止まる", () => {
-    const broken = files.map((file) =>
+    const broken = csvFiles.map((file) =>
       file.role === "preferences"
         ? { ...file, text: file.text.replace("L04", "L09") }
         : file
@@ -87,7 +138,7 @@ describe("buildInstance", () => {
   });
 
   it("GPA の無い学生を警告する", () => {
-    const missing = files.map((file) =>
+    const missing = csvFiles.map((file) =>
       file.role === "gpa" ? { ...file, text: file.text.replace(/^S001,.*$/m, "") } : file
     );
     const { warnings, instance } = buildInstance(missing, SEED);
@@ -96,14 +147,14 @@ describe("buildInstance", () => {
   });
 
   it("定員が足りなければ未配属が出ることを警告する", () => {
-    const tight = files.map((file) =>
+    const tight = csvFiles.map((file) =>
       file.role === "labs" ? { ...file, text: file.text.replaceAll(",3", ",2") } : file
     );
     expect(buildInstance(tight, SEED).warnings.some((w) => w.includes("未配属"))).toBe(true);
   });
 
   it("定員の列が無ければ、合計がちょうど学生数になるよう割り当て、そう言う", () => {
-    const noCapacity = files.map((file) =>
+    const noCapacity = csvFiles.map((file) =>
       file.role === "labs"
         ? {
             ...file,
@@ -120,31 +171,21 @@ describe("buildInstance", () => {
   });
 
   it("一部の研究室だけ定員が空欄なら、書き忘れとみて止まる", () => {
-    const partial = files.map((file) =>
+    const partial = csvFiles.map((file) =>
       file.role === "labs" ? { ...file, text: file.text.replace("L02,知能情報,3", "L02,知能情報,") } : file
     );
     expect(() => buildInstance(partial, SEED)).toThrow(/L02 の定員が空欄/);
   });
 
   it("エラーにファイル名を添える", () => {
-    const broken = files.map((file) =>
+    const broken = csvFiles.map((file) =>
       file.role === "gpa" ? { ...file, text: "学籍番号,GPA\nS001,あ\n" } : file
     );
     expect(() => buildInstance(broken, SEED)).toThrow(/gpa\.csv/);
   });
 });
 
-describe("buildInstance（eClass のファイルから）", () => {
-  const eclassFiles: SourceFile[] = [
-    sample("answer-utf8-sample.txt", "preferences"),
-    sample("eclass-gpa.csv", "gpa"),
-    sample("eclass-labs.csv", "labs"),
-    sample("eclass-scores-L01.csv", "scores"),
-    sample("eclass-scores-L02.csv", "scores"),
-    sample("eclass-scores-L03.csv", "scores"),
-    sample("eclass-scores-L04.csv", "scores"),
-  ];
-
+describe("buildInstance（eClass と Excel のファイルから）", () => {
   it("暫定 CSV でなくても、そうと見分けて読む", () => {
     const { instance } = buildInstance(eclassFiles, SEED);
     // 回答したのは 9 人。名簿（GPA）にはもう 1 人いる
@@ -184,7 +225,7 @@ describe("buildInstance（eClass のファイルから）", () => {
         name: "教員裁量点_○○先生.xlsx",
         role: "scores",
         text: "",
-        rows: sheetRows("教員裁量点_○○先生.xlsx"),
+        rows: sheetRows("教員裁量点_○○先生.xlsx", "教員裁量点"),
       },
     ];
     const { instance } = buildInstance(withExcel, SEED);
@@ -197,10 +238,10 @@ describe("buildInstance（eClass のファイルから）", () => {
       file.role === "labs"
         ? {
             ...file,
-            // 選択肢ラベルと教員氏名の列を落とし、研究室名をラベルと同じにする
+            // 選択肢ラベルの列を落とし、研究室名をラベルと同じにする
             text: file.text
-              .replace("研究室,研究室名,定員,選択肢ラベル,教員氏名", "研究室,研究室名,定員")
-              .replace(/^(L\d+),[^,]*,(\d+),([^,]*),.*$/gm, "$1,$3,$2"),
+              .replace("研究室,研究室名,定員,選択肢ラベル,教員氏名", "研究室,研究室名,定員,教員氏名")
+              .replace(/^(L\d+),[^,]*,(\d+),([^,]*),(.*)$/gm, "$1,$3,$2,$4"),
           }
         : file
     );
@@ -241,18 +282,54 @@ describe("buildInstance（eClass のファイルから）", () => {
   it("教員ごとの Excel を、教員氏名で研究室に結びつける", () => {
     const withExcel: SourceFile[] = [
       ...eclassFiles.filter((file) => file.role !== "scores"),
-      ...["○○", "△△", "□□", "◇◇"].map((teacher) => ({
-        name: `教員裁量点_${teacher}先生.xlsx`,
-        role: "scores" as const,
-        text: "",
-        rows: sheetRows(`教員裁量点_${teacher}先生.xlsx`),
-      })),
+      ...["○○", "△△", "□□", "◇◇"].map(scoreSheet),
     ];
     const { instance } = buildInstance(withExcel, SEED);
     const lab = instance.labs.find((entry) => entry.id === "L01")!;
     // テンプレートは 10 人ぶんあり、回答したのは 9 人
     expect(lab.scores.size).toBe(10);
     expect(lab.scores.get("1234560002")).toBeGreaterThanOrEqual(0);
+  });
+
+  it("名簿と裁量点の表が揃っていれば何も言わない", () => {
+    const withExcel: SourceFile[] = [
+      ...eclassFiles.filter((file) => file.role !== "scores"),
+      ...["○○", "△△", "□□", "◇◇"].map(scoreSheet),
+    ];
+    const { warnings } = buildInstance(withExcel, SEED);
+    expect(warnings.filter((warning) => /点数がありません|名簿に無い/.test(warning))).toEqual([]);
+  });
+
+  it("教員の表から学生の行が消えていれば、そう言う", () => {
+    const rows = sheetRows("教員裁量点_○○先生.xlsx", "教員裁量点");
+    const withExcel: SourceFile[] = [
+      ...eclassFiles.filter((file) => file.role !== "scores"),
+      {
+        name: "教員裁量点_○○先生.xlsx",
+        role: "scores",
+        text: "",
+        // 1234560007 の行を消す（空欄なら読み取りが止まるが、行が無いと 0 点になる）
+        rows: rows.filter((row) => row[0] !== "1234560007"),
+      },
+    ];
+    const { warnings } = buildInstance(withExcel, SEED);
+    expect(warnings.join()).toMatch(/教員裁量点_○○先生\.xlsx: 名簿にいる 1 人の点数がありません（1234560007）/);
+  });
+
+  it("名簿に無い学生の点数があれば、そう言って無視する", () => {
+    const rows = sheetRows("教員裁量点_○○先生.xlsx", "教員裁量点");
+    const withExcel: SourceFile[] = [
+      ...eclassFiles.filter((file) => file.role !== "scores"),
+      {
+        name: "教員裁量点_○○先生.xlsx",
+        role: "scores",
+        text: "",
+        rows: [...rows, ["9999999999", "他学科　学生", "○○　○○", "60"]],
+      },
+    ];
+    const { instance, warnings } = buildInstance(withExcel, SEED);
+    expect(warnings.join()).toMatch(/名簿に無い 1 人の点数があります（9999999999）/);
+    expect(instance.students.some((student) => student.id === "9999999999")).toBe(false);
   });
 
   it("教員氏名が研究室一覧に無ければ、入れるべき列を言って止まる", () => {
@@ -269,7 +346,7 @@ describe("buildInstance（eClass のファイルから）", () => {
         name: "教員裁量点_○○先生.xlsx",
         role: "scores" as const,
         text: "",
-        rows: sheetRows("教員裁量点_○○先生.xlsx"),
+        rows: sheetRows("教員裁量点_○○先生.xlsx", "教員裁量点"),
       },
     ];
     expect(() => buildInstance(noTeacher, SEED)).toThrow(/教員氏名/);

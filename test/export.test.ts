@@ -1,4 +1,6 @@
+// @vitest-environment jsdom
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildReport } from "../src/domain/report.js";
@@ -7,22 +9,32 @@ import { defaultParams, type Params } from "../src/domain/types.js";
 import { parseCsv } from "../src/io/csv.js";
 import { labsCsv, outputFileName, studentsCsv, summaryCsv } from "../src/io/export.js";
 import { buildInstance, type SourceFile } from "../src/io/intake.js";
+import { readWorkbook, sheetOf } from "../src/io/xlsx.js";
 
-const names = [
-  ["preferences.csv", "preferences"],
-  ["gpa.csv", "gpa"],
-  ["labs.csv", "labs"],
-  ["scores_L01.csv", "scores"],
-  ["scores_L02.csv", "scores"],
-  ["scores_L03.csv", "scores"],
-  ["scores_L04.csv", "scores"],
-] as const;
+function sheetRows(name: string, sheet: string): string[][] {
+  const bytes = new Uint8Array(readFileSync(resolve("samples", name)));
+  return sheetOf(readWorkbook(bytes), sheet).rows;
+}
 
-const files: SourceFile[] = names.map(([name, role]) => ({
-  name,
-  role,
-  text: readFileSync(new URL(`../samples/${name}`, import.meta.url), "utf8"),
-}));
+const files: SourceFile[] = [
+  {
+    name: "answer-utf8-sample.txt",
+    role: "preferences",
+    text: readFileSync(resolve("samples", "answer-utf8-sample.txt"), "utf8"),
+  },
+  { name: "GPA.xlsx", role: "gpa", text: "", rows: sheetRows("GPA.xlsx", "GPA") },
+  {
+    name: "eclass-labs.csv",
+    role: "labs",
+    text: readFileSync(resolve("samples", "eclass-labs.csv"), "utf8"),
+  },
+  ...["○○", "△△", "□□", "◇◇"].map((teacher) => ({
+    name: `教員裁量点_${teacher}先生.xlsx`,
+    role: "scores" as const,
+    text: "",
+    rows: sheetRows(`教員裁量点_${teacher}先生.xlsx`, "教員裁量点"),
+  })),
+];
 
 const SEED = 20260906;
 const params: Params = { ...defaultParams, seed: SEED };

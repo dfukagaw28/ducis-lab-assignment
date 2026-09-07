@@ -28,6 +28,13 @@ export interface PreferenceRow {
   preferences: string[];
 }
 
+export interface GpaRow {
+  id: string;
+  /** 学生氏名の列があれば。希望順位を出していない学生の氏名はここから取れる。 */
+  name?: string;
+  gpa: number;
+}
+
 export interface LabRow {
   id: string;
   name?: string;
@@ -91,18 +98,26 @@ export function parsePreferenceRows(rows: readonly string[][]): PreferenceRow[] 
     });
 }
 
-/** `学籍番号,GPA` */
-export function parseGpa(text: string): Map<string, number> {
+/** `学籍番号,GPA`。`学生氏名` の列があれば拾う。 */
+export function parseGpa(text: string): GpaRow[] {
   return parseGpaRows(parseCsv(text));
 }
 
-export function parseGpaRows(rows: readonly string[][]): Map<string, number> {
-  const gpa = new Map<string, number>();
+export function parseGpaRows(rows: readonly string[][]): GpaRow[] {
+  const seen = new Set<string>();
+  const gpa: GpaRow[] = [];
   for (const row of withHeader(rows)) {
     const id = pick(row, STUDENT_ID);
     if (id === undefined || id === "") continue;
-    if (gpa.has(id)) throw new Error(`学籍番号 ${id} が重複しています`);
-    gpa.set(id, toNumber(pick(row, GPA), `${id} の GPA`));
+    if (seen.has(id)) throw new Error(`学籍番号 ${id} が重複しています`);
+    seen.add(id);
+
+    const name = pick(row, STUDENT_NAME);
+    gpa.push({
+      id,
+      ...(name === undefined || name === "" ? {} : { name }),
+      gpa: toNumber(pick(row, GPA), `${id} の GPA`),
+    });
   }
   return gpa;
 }
