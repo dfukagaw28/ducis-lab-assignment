@@ -8,14 +8,19 @@ export function renderReport(root: HTMLElement, instance: Instance, report: Repo
   const { summary } = report;
   const labName = new Map(instance.labs.map((lab) => [lab.id, lab.name ?? lab.id]));
 
-  const distribution = summary.choiceCounts
-    .map((count, index) =>
-      count === 0
-        ? ""
-        : `<tr><td>第${index + 1}希望</td><td class="num">${count}</td>
-           <td class="num">${percent(count, summary.numStudents)}</td></tr>`
-    )
-    .join("");
+  const distribution =
+    summary.choiceCounts
+      .map((count, index) =>
+        count === 0
+          ? ""
+          : `<tr><td>第${index + 1}希望</td><td class="num">${count}</td>
+             <td class="num">${percent(count, summary.numStudents)}</td></tr>`
+      )
+      .join("") +
+    (summary.unlisted === 0
+      ? ""
+      : `<tr><td class="unlisted">希望外</td><td class="num">${summary.unlisted}</td>
+         <td class="num">${percent(summary.unlisted, summary.numStudents)}</td></tr>`);
 
   const studentRows = report.students
     .map(
@@ -27,7 +32,13 @@ export function renderReport(root: HTMLElement, instance: Instance, report: Repo
         <td${row.lab === null ? ' class="unmatched"' : ""}>${
           row.lab === null ? "未配属" : escapeHtml(labName.get(row.lab)!)
         }</td>
-        <td class="num">${row.choice === null ? "-" : `第${row.choice}希望`}</td>
+        <td class="num">${
+          row.choice !== null
+            ? `第${row.choice}希望`
+            : row.lab === null
+              ? "-"
+              : '<span class="unlisted">希望外</span>'
+        }</td>
         <td class="num">${row.total === null ? "-" : row.total.toFixed(1)}</td>
         <td class="num">${row.rankInLab ?? "-"}</td>
       </tr>`
@@ -58,6 +69,7 @@ export function renderReport(root: HTMLElement, instance: Instance, report: Repo
       <div><dt>研究室</dt><dd>${summary.numLabs} 室（定員計 ${summary.totalCapacity}）</dd></div>
       <div><dt>配属</dt><dd>${summary.matched} 人</dd></div>
       <div><dt>未配属</dt><dd>${summary.unmatched} 人</dd></div>
+      <div><dt>希望外に配属</dt><dd>${summary.unlisted} 人</dd></div>
     </dl>
     ${stability}
 

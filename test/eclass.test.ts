@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { BLOCKS, findBlock, splitSections, stripHtml } from "../src/io/eclass.js";
+import { readFileSync } from "node:fs";
+
+import {
+  BLOCKS,
+  findBlock,
+  parseEclassPreferences,
+  parseOptionLabels,
+  parseUserAnswers,
+  splitSections,
+  stripHtml,
+  type EclassBlock,
+} from "../src/io/eclass.js";
 
 /**
  * 実ファイルは個人情報を含むので置けない。形だけを真似た作り物で、構造の
@@ -174,14 +185,114 @@ describe("stripHtml", () => {
   });
 });
 
-// ここから先は実ファイルの列が分かってから
-describe.todo("parseOptionLabels", () => {
-  it.todo("option の列から 選択肢番号 → 研究室 の対応を作る");
-  it.todo("ラベルの HTML タグを外す");
+describe("parseOptionLabels", () => {
+  const labels = parseOptionLabels(splitSections(fixture).parameters);
+
+  it("option の列から 選択肢番号 → 研究室 の対応を作る", () => {
+    expect(labels.get(1)).toBe("情報数理");
+    expect(labels.get(2)).toBe("知能情報, 第2");
+  });
+
+  it("使われていない選択肢を落とす", () => {
+    const sparse = parseOptionLabels([
+      ["question", "option1", "option2", "option3"],
+      ["どれ", "<p>甲</p>", "", "<p>丙</p>"],
+    ]);
+    expect([...sparse.keys()]).toEqual([1, 3]);
+  });
+
+  it("option の列が無ければ止まる", () => {
+    expect(() => parseOptionLabels([["question"], ["どれ"]])).toThrow(/選択肢が一つも/);
+  });
 });
 
-describe.todo("parseUserAnswers", () => {
-  it.todo("学生ごとに希望順位を第 1 希望から並べる");
-  it.todo("順位が空の選択肢を落とす");
-  it.todo("同じ順位が二つあれば止まる");
+describe("parseUserAnswers", () => {
+  const labels = new Map([
+    [1, "○○研究室"],
+    [2, "△△研究室"],
+    [3, "□□研究室"],
+    [4, "◇◇研究室"],
+  ]);
+
+  function block(...rows: string[][]): EclassBlock {
+    return {
+      title: BLOCKS.perUser,
+      rows: [["<科目名>", "<ユーザ名>", "<学生ID>", "<回答時刻>", "<設問1/設問2/・・・>"], ...rows],
+    };
+  }
+
+  it("並び順が順位、値が選択肢の番号", () => {
+    // 1 位が option4、2 位が option1、3 位が option3、4 位が option2
+    const rows = parseUserAnswers(block(["科目", "架空 太郎", "S001", "時刻", "4, 1, 3, 2"]), labels);
+    expect(rows).toEqual([
+      {
+        id: "S001",
+        name: "架空 太郎",
+        preferences: ["◇◇研究室", "○○研究室", "□□研究室", "△△研究室"],
+      },
+    ]);
+  });
+
+  it("未解答は飛ばして順位を詰める", () => {
+    const rows = parseUserAnswers(block(["科目", "甲", "S001", "時刻", "4, 未解答, 3, 未解答"]), labels);
+    expect(rows[0]!.preferences).toEqual(["◇◇研究室", "□□研究室"]);
+  });
+
+  it("全部未解答なら希望なしとして通す", () => {
+    const answer = "未解答, 未解答, 未解答, 未解答";
+    const rows = parseUserAnswers(block(["科目", "甲", "S001", "時刻", answer]), labels);
+    expect(rows[0]!.preferences).toEqual([]);
+  });
+
+  it("選択肢にない番号があれば止まる", () => {
+    expect(() =>
+      parseUserAnswers(block(["科目", "甲", "S001", "時刻", "9, 1"]), labels)
+    ).toThrow(/選択肢にない番号 9/);
+  });
+
+  it("同じ選択肢が二度出てきたら止まる", () => {
+    expect(() =>
+      parseUserAnswers(block(["科目", "甲", "S001", "時刻", "1, 1"]), labels)
+    ).toThrow(/二度/);
+  });
+
+  it("学生 ID の空の行を落とす", () => {
+    const rows = parseUserAnswers(
+      block(["科目", "甲", "S001", "時刻", "1"], ["", "", "", "", ""]),
+      labels
+    );
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("parseEclassPreferences（実ファイルの見本）", () => {
+  const text = readFileSync(new URL("../samples/answer-utf8-sample.txt", import.meta.url), "utf8");
+  const rows = parseEclassPreferences(text);
+
+  it("回答した学生をすべて読む", () => {
+    expect(rows).toHaveLength(9);
+  });
+
+  it("学生 ID と氏名を取る", () => {
+    expect(rows[0]!.id).toBe("1234560002");
+    expect(rows[0]!.name).toBe("架空　太郎");
+  });
+
+  it("回答 4, 1, 3, 2 を 1 位から並べ直す", () => {
+    expect(rows[0]!.preferences).toEqual([
+      "◇◇研究室（◇◇　◇◇）",
+      "○○研究室（○○　○○）",
+      "□□研究室（□□　□□）",
+      "△△研究室（△△　△△）",
+    ]);
+  });
+
+  it("全部未解答の学生は希望なしになる", () => {
+    const blank = rows.find((row) => row.preferences.length === 0)!;
+    expect(blank.name).toBe("山田　テスト");
+  });
+
+  it("選択肢は使われている 4 つだけ", () => {
+    expect(parseOptionLabels(splitSections(text).parameters).size).toBe(4);
+  });
 });

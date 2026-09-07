@@ -11,7 +11,7 @@ import { toCsv, type CsvValue } from "./csv.js";
 export function studentsCsv(instance: Instance, report: Report): string {
   const labName = new Map(instance.labs.map((lab) => [lab.id, lab.name ?? lab.id]));
   const rows: CsvValue[][] = [
-    ["学籍番号", "氏名", "GPA", "抽選番号", "配属研究室", "研究室名", "希望順位", "総合点", "研究室内順位"],
+    ["学籍番号", "氏名", "GPA", "抽選番号", "配属研究室", "研究室名", "希望順位", "希望外", "総合点", "研究室内順位"],
   ];
   for (const row of report.students) {
     rows.push([
@@ -22,6 +22,7 @@ export function studentsCsv(instance: Instance, report: Report): string {
       row.lab ?? "",
       row.lab === null ? "" : labName.get(row.lab)!,
       row.choice ?? "",
+      row.lab !== null && !row.listed ? "○" : "",
       row.total === null ? "" : round(row.total),
       row.rankInLab ?? "",
     ]);
@@ -73,6 +74,7 @@ export function summaryCsv(report: Report, params: Params): string {
     ["定員の合計", summary.totalCapacity],
     ["配属", summary.matched],
     ["未配属", summary.unmatched],
+    ["希望外に配属", summary.unlisted],
     ["ブロッキングペア", summary.blockingPairs.length],
     [],
     ["希望順位", "人数"],

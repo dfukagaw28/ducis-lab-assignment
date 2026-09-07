@@ -126,40 +126,118 @@ export function findBlock(sections: EclassSections, title: string): EclassBlock 
   return found;
 }
 
+/** 回答が空欄だった選択肢。順位を詰めて読み飛ばす。 */
+const UNANSWERED = "未解答";
+
 /**
- * 選択肢ラベル。option1 … option26 の列から、研究室を表す文字列を取り出す。
+ * 選択肢ラベル。`option1` … `option26` の列から、研究室を表す文字列を取り出す。
  *
- * ラベルは `<p>...</p>` の HTML なので、stripHtml() で中のテキストだけにする。
+ * ラベルは `<p tagname="p">○○研究室（○○　○○）</p>` のような HTML なので、
+ * タグを外した中身だけを使う。使われていない選択肢は値が空欄なので落とす。
  *
- * TODO: パラメータの 2 行（見出しと値）のどの列が option かを見て、
- *       選択肢の番号 → 研究室 の対応を作る。
+ * 返すのは 選択肢の番号 → 研究室 の対応。回答が選択肢を番号で指すので、
+ * 番号のまま引けるようにしておく。
  */
-export function parseOptionLabels(parameters: readonly string[][]): Map<string, string> {
-  throw new Error(`parseOptionLabels は未実装です（パラメータ ${parameters.length} 行）`);
+export function parseOptionLabels(parameters: readonly string[][]): Map<number, string> {
+  const [header, values] = parameters;
+  if (header === undefined || values === undefined) {
+    throw new Error("パラメータの行が 2 行ありません");
+  }
+
+  const labels = new Map<number, string>();
+  header.forEach((key, column) => {
+    const match = /^option(\d+)$/i.exec(key.trim());
+    if (match === null) return;
+    const label = stripHtml(values[column] ?? "");
+    if (label !== "") labels.set(Number(match[1]), label);
+  });
+
+  if (labels.size === 0) throw new Error("option の列に選択肢が一つもありません");
+  return labels;
 }
 
 /**
  * メインのブロック。学生ごとの回答を希望順位に直す。
  *
- * TODO: 学籍番号・氏名の列と、選択肢ごとの順位が入った列を読み、
- *       PreferenceRow[]（第 1 希望から並べた研究室）にする。
- *       研究室の名前は labels で引く。
+ * 回答は `4, 1, 3, 2` のように 1 列にまとまっていて、並び順が順位、値が選択肢の
+ * 番号を指す（この例なら 1 位が option4、2 位が option1）。`未解答` が混じったら
+ * その順位を飛ばし、後ろを繰り上げる。
  */
 export function parseUserAnswers(
   block: EclassBlock,
-  labels: ReadonlyMap<string, string>
+  labels: ReadonlyMap<number, string>
 ): PreferenceRow[] {
-  throw new Error(
-    `parseUserAnswers は未実装です（${block.rows.length} 行、選択肢 ${labels.size} 個）`
-  );
+  const [header, ...body] = block.rows;
+  if (header === undefined) throw new Error(`[${block.title}] に見出しの行がありません`);
+
+  // 見出しは `<学生ID>` のように山括弧で囲まれている
+  const keys = header.map((key) => key.trim().replace(/^<|>$/g, ""));
+  const idColumn = findColumn(keys, ["学生ID", "学籍番号", "学生番号", "ユーザID"]);
+  if (idColumn < 0) throw new Error(`[${block.title}] に学生 ID の列がありません`);
+  const nameColumn = findColumn(keys, ["ユーザ名", "氏名", "名前"]);
+  const answerColumn = keys.findIndex((key) => key.includes("設問"));
+  if (answerColumn < 0) throw new Error(`[${block.title}] に設問の列がありません`);
+
+  return body
+    .filter((row) => (row[idColumn] ?? "").trim() !== "")
+    .map((row) => {
+      const id = row[idColumn]!.trim();
+      const name = nameColumn < 0 ? "" : (row[nameColumn] ?? "").trim();
+      return {
+        id,
+        ...(name === "" ? {} : { name }),
+        preferences: rankedLabs(id, row[answerColumn] ?? "", labels),
+      };
+    });
+}
+
+/** `4, 1, 3, 2` を、1 位から並べた研究室に直す。 */
+function rankedLabs(
+  id: string,
+  answer: string,
+  labels: ReadonlyMap<number, string>
+): string[] {
+  const preferences: string[] = [];
+  const seen = new Set<number>();
+
+  for (const cell of answer.split(",")) {
+    const value = cell.trim();
+    if (value === "" || value === UNANSWERED) continue;
+
+    const option = Number(value);
+    if (!Number.isInteger(option)) {
+      throw new Error(`${id} の回答に選択肢の番号でない値があります: ${value}`);
+    }
+    const label = labels.get(option);
+    if (label === undefined) {
+      throw new Error(`${id} の回答に、選択肢にない番号 ${option} があります`);
+    }
+    if (seen.has(option)) {
+      throw new Error(`${id} の回答に選択肢 ${option} が二度出てきます`);
+    }
+    seen.add(option);
+    preferences.push(label);
+  }
+
+  return preferences;
+}
+
+function findColumn(keys: readonly string[], aliases: readonly string[]): number {
+  return keys.findIndex((key) => aliases.some((alias) => key === alias));
 }
 
 /**
  * 入口。intake.ts からは、暫定 CSV の parsePreferences の代わりにこれを呼ぶ。
+ *
+ * 研究室は選択肢ラベルの文字列そのままで返す。研究室一覧の側でこの文字列に
+ * 対応づける必要がある。
  */
 export function parseEclassPreferences(text: string): PreferenceRow[] {
   const sections = splitSections(text);
-  return parseUserAnswers(findBlock(sections, BLOCKS.perUser), parseOptionLabels(sections.parameters));
+  return parseUserAnswers(
+    findBlock(sections, BLOCKS.perUser),
+    parseOptionLabels(sections.parameters)
+  );
 }
 
 /** `<p>情報数理</p>` → `情報数理`。実体参照も戻す。 */

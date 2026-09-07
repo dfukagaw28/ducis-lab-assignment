@@ -10,8 +10,10 @@ export interface StudentRow {
   lottery: number;
   /** 配属先。未配属なら null */
   lab: LabId | null;
-  /** 第何希望か。未配属なら null */
+  /** 第何希望か。自分で順位を付けていない研究室に配属されたか、未配属なら null */
   choice: number | null;
+  /** 配属先が学生自身の希望順位表にあったか */
+  listed: boolean;
   /** 配属先での総合点。未配属なら null */
   total: number | null;
   /** 配属先での順位（1 始まり）。未配属なら null */
@@ -40,6 +42,8 @@ export interface Summary {
   unmatched: number;
   /** choiceCounts[k] は第 k+1 希望に配属された人数 */
   choiceCounts: number[];
+  /** 自分で順位を付けていない研究室に配属された人数 */
+  unlisted: number;
   blockingPairs: BlockingPair[];
 }
 
@@ -58,13 +62,16 @@ export function buildReport(instance: Instance, assignment: Assignment): Report 
       lab === null
         ? undefined
         : assignment.rankings.get(lab)!.find((entry) => entry.id === student.id);
+    // 希望順位は学生が自分で付けた表で数える。補完で足した研究室は「希望外」。
+    const choice = lab === null ? -1 : student.preferences.indexOf(lab);
     return {
       id: student.id,
       ...(student.name === undefined ? {} : { name: student.name }),
       gpa: student.gpa,
       lottery: assignment.lottery.get(student.id)!,
       lab,
-      choice: lab === null ? null : student.preferences.indexOf(lab) + 1,
+      choice: choice < 0 ? null : choice + 1,
+      listed: choice >= 0,
       total: scored?.total ?? null,
       rankInLab: lab === null ? null : positions.get(lab)!.get(student.id)! + 1,
     };
@@ -98,6 +105,7 @@ export function buildReport(instance: Instance, assignment: Assignment): Report 
       matched,
       unmatched: students.length - matched,
       choiceCounts,
+      unlisted: students.filter((row) => row.lab !== null && !row.listed).length,
       blockingPairs: findBlockingPairs(instance, assignment, positions),
     },
     students,
@@ -111,6 +119,10 @@ export function buildReport(instance: Instance, assignment: Assignment): Report 
  *
  * 学生 s と研究室 h がブロッキングペアなのは、s が今の配属先より h を好み、かつ
  * h に空きがあるか h が今抱えている誰かより s を好むとき。
+ *
+ * 学生の好みは、解くのに使った（全研究室まで広げた）順位表で見る。学生が自分で
+ * 順位を付けた分だけで見ると、希望外に配属された学生がすべての研究室を今より
+ * 好むことになり、ありもしないブロッキングペアが並ぶ。
  */
 export function findBlockingPairs(
   instance: Instance,
@@ -121,13 +133,14 @@ export function findBlockingPairs(
   const pairs: BlockingPair[] = [];
 
   for (const student of instance.students) {
+    const preferences = assignment.completed.get(student.id) ?? student.preferences;
     const current = assignment.studentToLab.get(student.id);
     // 未配属ならどの希望も今より良い
     const currentChoice =
-      current === undefined ? student.preferences.length : student.preferences.indexOf(current);
+      current === undefined ? preferences.length : preferences.indexOf(current);
 
     for (let i = 0; i < currentChoice; i++) {
-      const labId = student.preferences[i]!;
+      const labId = preferences[i]!;
       const rank = positions.get(labId)?.get(student.id);
       if (rank === undefined) continue; // その研究室にとって受け入れ不可
 
