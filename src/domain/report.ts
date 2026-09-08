@@ -30,6 +30,10 @@ export interface LabRow {
   capacity: number;
   filled: number;
   students: StudentId[];
+  /** この研究室を第 1 希望に挙げた学生の数 */
+  firstChoice: number;
+  /** この研究室をどこかに挙げた学生の数 */
+  ranked: number;
   /**
    * 希望を出した学生にとっての合格ライン。ここを下回った提出者は入れなかった。
    *
@@ -99,6 +103,17 @@ export function buildReport(instance: Instance, assignment: Assignment): Report 
     row.lab === null ? instance.labs.length : labOrder.get(row.lab)!;
   students.sort((a, b) => placeOf(a) - placeOf(b) || compareIds(a.id, b.id));
 
+  // 希望の集中度。学生が自分で書いた表で数えるので、未提出者は含まれない。
+  const firstChoices = new Map<LabId, number>();
+  const rankedBy = new Map<LabId, number>();
+  for (const student of instance.students) {
+    const first = student.preferences[0];
+    if (first !== undefined) firstChoices.set(first, (firstChoices.get(first) ?? 0) + 1);
+    for (const labId of new Set(student.preferences)) {
+      rankedBy.set(labId, (rankedBy.get(labId) ?? 0) + 1);
+    }
+  }
+
   const labs: LabRow[] = instance.labs.map((lab) => {
     const assigned = assignment.labToStudents.get(lab.id) ?? [];
     const scored = new Map(assignment.rankings.get(lab.id)!.map((entry) => [entry.id, entry]));
@@ -117,6 +132,8 @@ export function buildReport(instance: Instance, assignment: Assignment): Report 
       capacity: lab.capacity,
       filled: assigned.length,
       students: assigned,
+      firstChoice: firstChoices.get(lab.id) ?? 0,
+      ranked: rankedBy.get(lab.id) ?? 0,
       cutoff,
     };
   });

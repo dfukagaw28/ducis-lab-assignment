@@ -65,10 +65,13 @@ describe("studentsCsv", () => {
 describe("labsCsv", () => {
   const rows = parseCsv(labsCsv(instance, report));
 
-  it("合格ラインを書く", () => {
+  it("希望の集中度と合格ラインを書く", () => {
     for (const lab of report.labs) {
       const row = rows.find((entry) => entry[0] === lab.id)!;
-      expect(row[4]).toBe(lab.cutoff === null ? "" : String(Math.round(lab.cutoff * 100) / 100));
+      expect(row[4]).toBe(String(lab.firstChoice));
+      expect(row[5]).toBe(String(Math.round((lab.firstChoice / lab.capacity) * 100) / 100));
+      expect(row[6]).toBe(String(lab.ranked));
+      expect(row[7]).toBe(lab.cutoff === null ? "" : String(Math.round(lab.cutoff * 100) / 100));
     }
   });
 
@@ -79,8 +82,8 @@ describe("labsCsv", () => {
 
   it("配属順位を 1 から振る", () => {
     const first = report.labs.find((lab) => lab.students.length > 0)!;
-    const row = rows.find((entry) => entry[0] === first.id && entry[5] === "1")!;
-    expect(row[6]).toBe(first.students[0]);
+    const row = rows.find((entry) => entry[0] === first.id && entry[8] === "1")!;
+    expect(row[9]).toBe(first.students[0]);
   });
 });
 

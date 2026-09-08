@@ -56,6 +56,12 @@ export function renderReport(
       (lab) => `<tr>
         <td>${escapeHtml(lab.name ?? lab.id)}</td>
         <td class="num">${lab.filled} / ${lab.capacity}</td>
+        <td class="num">${lab.firstChoice}${
+          lab.capacity > 0
+            ? ` <span class="hint">${(lab.firstChoice / lab.capacity).toFixed(1)}倍</span>`
+            : ""
+        }</td>
+        <td class="num">${lab.ranked}</td>
         <td class="num">${
           lab.cutoff === null
             ? '<span class="hint">なし</span>'
@@ -98,12 +104,15 @@ export function renderReport(
 
     <h3>研究室別</h3>
     <p class="hint">
-      合格ラインは、希望を出した学生がその研究室に入るのに要した総合点。定員に空きが
-      あるか、希望を出さなかった学生が入っている研究室には線がありません（希望すれば
-      入れたということなので「なし」）。
+      「第 1 希望」は、その研究室を第 1 希望に挙げた学生の数と、定員に対する倍率。
+      「希望者」はどこかに挙げた学生の数。どちらも希望を出した学生だけを数えています。
+      合格ラインは、希望を出した学生がその研究室に入るのに要した総合点で、定員に
+      空きがあるか、希望を出さなかった学生が入っている研究室にはありません（希望
+      すれば入れたということなので「なし」）。
     </p>
     <table><thead><tr>
-      <th>研究室</th><th class="num">配属 / 定員</th><th class="num">合格ライン</th><th>学生</th>
+      <th>研究室</th><th class="num">配属 / 定員</th><th class="num">第 1 希望</th>
+      <th class="num">希望者</th><th class="num">合格ライン</th><th>学生</th>
     </tr></thead>
       <tbody>${labRows}</tbody></table>
 
