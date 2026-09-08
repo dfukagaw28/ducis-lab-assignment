@@ -109,7 +109,6 @@ export function summaryRows(report: Report, params: Params): CsvValue[][] {
     ["GPA の満点", params.gpaMax],
     ["裁量点 配点", params.discretionaryWeight],
     ["裁量点の満点", params.discretionaryMax],
-    ["裁量点が無い学生", params.missingScore === "zero" ? "0 点として扱う" : "受け入れ不可"],
     ["学生数", summary.numStudents],
     ["研究室数", summary.numLabs],
     ["定員の合計", summary.totalCapacity],

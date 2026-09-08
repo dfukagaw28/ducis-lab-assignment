@@ -26,13 +26,6 @@ export interface Instance {
   labs: readonly Lab[];
 }
 
-/** 裁量点ファイルに載っていない学生をどう扱うか。 */
-export type MissingScorePolicy =
-  /** 0 点として扱う（その研究室に配属されうる） */
-  | "zero"
-  /** 受け入れ不可として扱う（その研究室には配属されない） */
-  | "unacceptable";
-
 export interface Params {
   /** 同点処理の抽選に使う。結果に必ず記録する。 */
   seed: number;
@@ -44,7 +37,6 @@ export interface Params {
   discretionaryWeight: number;
   /** 教員裁量点の素点の満点 */
   discretionaryMax: number;
-  missingScore: MissingScorePolicy;
 }
 
 /** 32 bit の乱数シード。ページ読み込みごとに引き直す。 */
@@ -59,5 +51,4 @@ export const defaultParams: Omit<Params, "seed"> = {
   gpaMax: 4,
   discretionaryWeight: 60,
   discretionaryMax: 60,
-  missingScore: "zero",
 };

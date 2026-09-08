@@ -19,16 +19,18 @@
  *
  * これはライブラリの `tieLast` と同じ考え方で、`HospitalResident.setTieLast()` と
  * `residentPrefsCompleted()` が作る表と同じものを作っている。それを使わず自前で
- * 持っているのは三つの理由による。
+ * 持っているのは二つの理由による。
  *
  * - `tieLast` は添字で組まれた `HospitalResident` の機能で、`stableMatch` には無い。
  *   使うには学生と研究室を添字に直し、結果を名前に戻すことになる。
  * - `setTieLast` のシャッフルは学生の添字順に乱数を消費するので、入力ファイルの
  *   行順で結果が変わる。
- * - `HospitalResident.solve()` は研究室側の選好リストが完全であることを前提に
- *   している。載っていない学生の順位は -1 で、それが最上位として扱われるため、
- *   `missingScore: "unacceptable"` で受け入れ不可にした学生が逆に最優先になる。
- *   `stableMatch` は相互に載っていることを求めるので、この問題は無い。
+ *
+ * もう一つ、`HospitalResident.solve()` は研究室側の選好リストが完全であることを
+ * 前提にしている（載っていない学生の順位が -1 で、それが最上位として扱われる）。
+ * いまは全学生がどの研究室の並びにも載るので実害は無いが、乗り換えるなら踏む前に
+ * 知っておくべき穴ではある。`stableMatch` は相互に載っていることを求めるので、
+ * この問題は無い。
  */
 
 import { Pcg32Rng, permutation } from "hospital-resident-matching";

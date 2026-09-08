@@ -42,16 +42,10 @@ describe("rankStudents", () => {
     expect(ranked.map((entry) => entry.id)).toEqual(["b", "c", "a"]);
   });
 
-  it("裁量点が無い学生は既定では 0 点として並びに入る", () => {
+  it("裁量点が無い学生は 0 点として並びに入る", () => {
     const ranked = rankStudents(lab({ a: 0, b: 60 }), students, params, lottery);
     expect(ranked.map((entry) => entry.id)).toContain("c");
     expect(ranked.find((entry) => entry.id === "c")!.discretionaryPoint).toBe(0);
-  });
-
-  it("unacceptable なら裁量点が無い学生を並びから外す", () => {
-    const strict: Params = { ...params, missingScore: "unacceptable" };
-    const ranked = rankStudents(lab({ a: 0, b: 60 }), students, strict, lottery);
-    expect(ranked.map((entry) => entry.id)).toEqual(["b", "a"]);
   });
 
   it("希望順位を出していない学生を、点数にかかわらず後ろに置く", () => {
