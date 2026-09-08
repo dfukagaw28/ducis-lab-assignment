@@ -52,6 +52,23 @@ describe("page", () => {
     expect(app.querySelector<HTMLElement>("#output")!.textContent).toContain(seed.value);
   });
 
+  it("希望順位の内訳に帯を添える", () => {
+    const table = app.querySelector<HTMLElement>("table.distribution")!;
+    const bars = table.querySelectorAll<HTMLElement>(".bar");
+    expect(bars.length).toBeGreaterThan(0);
+
+    for (const bar of bars) {
+      // 帯の長さは学生数に対する割合
+      expect(bar.style.width).toMatch(/^\d+(\.\d+)?%$/);
+    }
+
+    // 色だけに頼らせない。区分の名前と人数はどの行にも文字で出る
+    for (const row of table.querySelectorAll("tbody tr")) {
+      expect(row.children[0]!.textContent).toMatch(/希望|未配属/);
+      expect(row.children[1]!.textContent).toMatch(/^\d+$/);
+    }
+  });
+
   it("シードのぶれを試すと、その場に結果が出る", async () => {
     const runs = app.querySelector<HTMLInputElement>("#runs")!;
     runs.value = "20";

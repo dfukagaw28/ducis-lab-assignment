@@ -14,19 +14,7 @@ export function renderReport(
   const { summary } = report;
   const labName = new Map(instance.labs.map((lab) => [lab.id, lab.name ?? lab.id]));
 
-  const distribution =
-    summary.choiceCounts
-      .map((count, index) =>
-        count === 0
-          ? ""
-          : `<tr><td>第${index + 1}希望</td><td class="num">${count}</td>
-             <td class="num">${percent(count, summary.numStudents)}</td></tr>`
-      )
-      .join("") +
-    (summary.unlisted === 0
-      ? ""
-      : `<tr><td class="unlisted">希望外</td><td class="num">${summary.unlisted}</td>
-         <td class="num">${percent(summary.unlisted, summary.numStudents)}</td></tr>`);
+  const distribution = distributionRows(summary);
 
   const studentRows = report.students
     .map(
@@ -99,8 +87,12 @@ export function renderReport(
     </div>
 
     <h3>希望順位の内訳</h3>
-    <table><thead><tr><th>希望</th><th class="num">人数</th><th class="num">割合</th></tr></thead>
-      <tbody>${distribution}</tbody></table>
+    <table class="distribution">
+      <thead><tr>
+        <th>希望</th><th class="num">人数</th><th class="num">割合</th><th class="bar-head"></th>
+      </tr></thead>
+      <tbody>${distribution}</tbody>
+    </table>
 
     <h3>研究室別</h3>
     <p class="hint">
@@ -183,4 +175,43 @@ function followUpSection(report: Report, labName: ReadonlyMap<string, string>): 
       <th>理由</th><th>学籍番号</th><th>氏名</th><th>配属先</th><th class="num">希望順位</th>
     </tr></thead><tbody>${rows}</tbody></table>
   `;
+}
+
+/**
+ * 希望順位の内訳。数字の横に帯を添える。
+ *
+ * 帯の長さは学生数に対する割合。ここに並ぶのは学生を分け合った区分なので、
+ * 最大値ではなく全体に対して測る方が「ほとんどが第 1 希望に入った」がそのまま
+ * 長さになる。数字は表のまま残してあるので、帯は読みを速くするだけのもの。
+ */
+function distributionRows(summary: Report["summary"]): string {
+  const last = summary.choiceCounts.reduce(
+    (found, count, index) => (count > 0 ? index : found),
+    -1
+  );
+
+  const entries: Array<{ label: string; count: number; kind: string }> = summary.choiceCounts
+    .slice(0, last + 1)
+    .map((count, index) => ({ label: `第${index + 1}希望`, count, kind: "choice" }));
+
+  if (summary.unlisted > 0) {
+    entries.push({ label: "希望外", count: summary.unlisted, kind: "unlisted" });
+  }
+  if (summary.unmatched > 0) {
+    entries.push({ label: "未配属", count: summary.unmatched, kind: "unmatched" });
+  }
+
+  return entries
+    .map(({ label, count, kind }) => {
+      const share = summary.numStudents === 0 ? 0 : count / summary.numStudents;
+      return `<tr>
+        <td class="${kind}">${label}</td>
+        <td class="num">${count}</td>
+        <td class="num">${percent(count, summary.numStudents)}</td>
+        <td class="bar-cell">${
+          count === 0 ? "" : `<div class="bar ${kind}" style="width: ${(share * 100).toFixed(1)}%"></div>`
+        }</td>
+      </tr>`;
+    })
+    .join("");
 }
