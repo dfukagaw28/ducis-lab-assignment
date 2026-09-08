@@ -30,6 +30,17 @@ export interface LabRow {
   capacity: number;
   filled: number;
   students: StudentId[];
+  /**
+   * 希望を出した学生にとっての合格ライン。ここを下回った提出者は入れなかった。
+   *
+   * 出せるのは、定員が埋まっていて、かつ埋めているのが全員提出者のときだけ。
+   * 空きがあるか、未提出者が入っているなら、その研究室を希望した提出者は全員
+   * 入れたということなので、線は無い（null）。
+   *
+   * 安定マッチングの性質から、この線は「下回った提出者は入れなかった」と同時に
+   * 「上回った提出者は入れた（か、もっと上の希望に入った）」も意味する。
+   */
+  cutoff: number | null;
 }
 
 export interface BlockingPair {
@@ -90,12 +101,23 @@ export function buildReport(instance: Instance, assignment: Assignment): Report 
 
   const labs: LabRow[] = instance.labs.map((lab) => {
     const assigned = assignment.labToStudents.get(lab.id) ?? [];
+    const scored = new Map(assignment.rankings.get(lab.id)!.map((entry) => [entry.id, entry]));
+    const placed = assigned.map((id) => scored.get(id)!);
+
+    const full = lab.capacity > 0 && assigned.length >= lab.capacity;
+    const allSubmitted = placed.every((entry) => entry.submitted);
+    const cutoff =
+      full && allSubmitted && placed.length > 0
+        ? Math.min(...placed.map((entry) => entry.total))
+        : null;
+
     return {
       id: lab.id,
       ...(lab.name === undefined ? {} : { name: lab.name }),
       capacity: lab.capacity,
       filled: assigned.length,
       students: assigned,
+      cutoff,
     };
   });
 

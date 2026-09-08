@@ -106,3 +106,70 @@ describe("findBlockingPairs", () => {
     expect(findBlockingPairs(instance, broken)).toEqual([{ student: "s1", lab: "X" }]);
   });
 });
+
+describe("合格ライン", () => {
+  /** 4 人が同じ研究室を希望し、定員は 2。点数は裁量点で差を付ける。 */
+  function contested(preferences: Record<string, string[]>, scores: Record<string, number>): Instance {
+    return {
+      students: Object.entries(preferences).map(([id, wanted]) => ({
+        id,
+        gpa: 0,
+        preferences: wanted,
+      })),
+      labs: [
+        { id: "X", capacity: 2, scores: new Map(Object.entries(scores)) },
+        { id: "Y", capacity: 4, scores: new Map(Object.entries(scores)) },
+      ],
+    };
+  }
+
+  it("定員が埋まったら、入った提出者の最低点が線になる", () => {
+    const instance = contested(
+      { s1: ["X", "Y"], s2: ["X", "Y"], s3: ["X", "Y"], s4: ["X", "Y"] },
+      { s1: 60, s2: 50, s3: 40, s4: 30 }
+    );
+    const report = buildReport(instance, assign(instance, params));
+    const x = report.labs.find((lab) => lab.id === "X")!;
+    expect(x.students).toEqual(["s1", "s2"]);
+    expect(x.cutoff).toBe(50);
+  });
+
+  it("線を下回った提出者は入れていない", () => {
+    const instance = contested(
+      { s1: ["X", "Y"], s2: ["X", "Y"], s3: ["X", "Y"], s4: ["X", "Y"] },
+      { s1: 60, s2: 50, s3: 40, s4: 30 }
+    );
+    const report = buildReport(instance, assign(instance, params));
+    const x = report.labs.find((lab) => lab.id === "X")!;
+    for (const row of report.students) {
+      const total = row.lab === "X" ? row.total! : Number.NaN;
+      if (row.lab !== "X") continue;
+      expect(total).toBeGreaterThanOrEqual(x.cutoff!);
+    }
+  });
+
+  it("空きがあれば線は無い", () => {
+    const instance = contested({ s1: ["X", "Y"] }, { s1: 60 });
+    const report = buildReport(instance, assign(instance, params));
+    expect(report.labs.find((lab) => lab.id === "X")!.cutoff).toBeNull();
+  });
+
+  it("未提出者が入っているなら線は無い（希望すれば入れたということ）", () => {
+    // s3 は希望を出していないが、点は高い
+    const instance = contested(
+      { s1: ["X", "Y"], s2: ["X", "Y"], s3: [] },
+      { s1: 60, s2: 50, s3: 55 }
+    );
+    const report = buildReport(instance, assign(instance, params));
+    const x = report.labs.find((lab) => lab.id === "X")!;
+    expect(x.students).toEqual(["s1", "s2"]);
+    expect(x.cutoff).toBe(50);
+
+    // 定員 2 に提出者が 1 人しか来なければ、残りは未提出者で埋まり、線は消える
+    const loose = contested({ s1: ["X", "Y"], s3: [] }, { s1: 60, s3: 55 });
+    const looseReport = buildReport(loose, assign(loose, params));
+    const looseX = looseReport.labs.find((lab) => lab.id === "X")!;
+    expect(looseX.filled).toBe(2);
+    expect(looseX.cutoff).toBeNull();
+  });
+});

@@ -67,11 +67,12 @@ export function labRows(instance: Instance, report: Report): CsvValue[][] {
   const studentName = new Map(instance.students.map((s) => [s.id, s.name ?? ""]));
   const byId = new Map(report.students.map((row) => [row.id, row]));
   const rows: CsvValue[][] = [
-    ["研究室", "研究室名", "定員", "配属人数", "配属順位", "学籍番号", "氏名", "総合点", "希望順位"],
+    ["研究室", "研究室名", "定員", "配属人数", "合格ライン", "配属順位", "学籍番号", "氏名", "総合点", "希望順位"],
   ];
   for (const lab of report.labs) {
+    const cutoff = lab.cutoff === null ? "" : round(lab.cutoff);
     if (lab.students.length === 0) {
-      rows.push([lab.id, lab.name ?? "", lab.capacity, 0, "", "", "", "", ""]);
+      rows.push([lab.id, lab.name ?? "", lab.capacity, 0, cutoff, "", "", "", "", ""]);
       continue;
     }
     lab.students.forEach((id, index) => {
@@ -81,6 +82,7 @@ export function labRows(instance: Instance, report: Report): CsvValue[][] {
         lab.name ?? "",
         lab.capacity,
         lab.filled,
+        cutoff,
         index + 1,
         id,
         studentName.get(id) ?? "",

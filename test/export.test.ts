@@ -65,6 +65,13 @@ describe("studentsCsv", () => {
 describe("labsCsv", () => {
   const rows = parseCsv(labsCsv(instance, report));
 
+  it("合格ラインを書く", () => {
+    for (const lab of report.labs) {
+      const row = rows.find((entry) => entry[0] === lab.id)!;
+      expect(row[4]).toBe(lab.cutoff === null ? "" : String(Math.round(lab.cutoff * 100) / 100));
+    }
+  });
+
   it("配属された学生を 1 行ずつ書く", () => {
     const assigned = report.labs.reduce((sum, lab) => sum + Math.max(lab.students.length, 1), 0);
     expect(rows).toHaveLength(assigned + 1);
@@ -72,8 +79,8 @@ describe("labsCsv", () => {
 
   it("配属順位を 1 から振る", () => {
     const first = report.labs.find((lab) => lab.students.length > 0)!;
-    const row = rows.find((entry) => entry[0] === first.id && entry[4] === "1")!;
-    expect(row[5]).toBe(first.students[0]);
+    const row = rows.find((entry) => entry[0] === first.id && entry[5] === "1")!;
+    expect(row[6]).toBe(first.students[0]);
   });
 });
 
