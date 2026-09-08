@@ -107,6 +107,39 @@ describe("findBlockingPairs", () => {
   });
 });
 
+describe("希望の集中度", () => {
+  const instance: Instance = {
+    students: [
+      { id: "s1", gpa: 3, preferences: ["X", "Y"] },
+      { id: "s2", gpa: 3, preferences: ["X"] },
+      { id: "s3", gpa: 3, preferences: ["Y", "X"] },
+      // 希望を出していない学生は数に入らない
+      { id: "s4", gpa: 3, preferences: [] },
+    ],
+    labs: [
+      { id: "X", capacity: 2, scores: new Map([["s1", 10], ["s2", 20], ["s3", 30], ["s4", 40]]) },
+      { id: "Y", capacity: 2, scores: new Map([["s1", 10], ["s2", 20], ["s3", 30], ["s4", 40]]) },
+    ],
+  };
+  const report = buildReport(instance, assign(instance, params));
+  const lab = (id: string) => report.labs.find((entry) => entry.id === id)!;
+
+  it("第 1 希望に挙げた学生を数える", () => {
+    expect(lab("X").firstChoice).toBe(2);
+    expect(lab("Y").firstChoice).toBe(1);
+  });
+
+  it("どこかに挙げた学生も数える", () => {
+    expect(lab("X").ranked).toBe(3);
+    expect(lab("Y").ranked).toBe(2);
+  });
+
+  it("希望を出していない学生は数に入れない", () => {
+    const counted = report.labs.reduce((sum, entry) => sum + entry.firstChoice, 0);
+    expect(counted).toBe(3);
+  });
+});
+
 describe("合格ライン", () => {
   /** 4 人が同じ研究室を希望し、定員は 2。点数は裁量点で差を付ける。 */
   function contested(preferences: Record<string, string[]>, scores: Record<string, number>): Instance {
