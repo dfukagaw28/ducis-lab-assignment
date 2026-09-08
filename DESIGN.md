@@ -313,7 +313,7 @@ Vite の `resolve.alias` でスタブに逃がす（`examples/web/vite.config.ts
 - **M1** ドメイン層（スコア計算 → stableMatch → 集計）＋ 合成データによるユニットテスト
 - **M2** UI 骨組み（D&D、パラメータ、結果表示、CSV 出力）— 合成データで一本通す
 - **M3** 実ファイルのパーサ実装（eClass テキスト / GPA Excel / 裁量点 Excel）
-- **M4** Excel 出力、安定性検証、統計表示、GitHub Pages 公開
+- **M4** Excel 出力、統計表示（安定性検証と GitHub Pages 公開は済み）
 
 M1・M2 は実ファイルの形式が未確定でも進められる。
 

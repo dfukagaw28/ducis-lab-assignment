@@ -26,6 +26,25 @@ npm run preview  # dist/ を配信して確認
 `dist/` は相対パス（`base: "./"`）で参照するので、GitHub Pages でもサブディレクトリ
 でもそのまま置けます。
 
+## 公開する
+
+`main` に push すると GitHub Actions がビルドして GitHub Pages に配信します
+（`.github/workflows/deploy.yml`）。**最初に一度だけ**、GitHub のリポジトリの
+Settings → Pages で Source を **GitHub Actions** に設定してください。
+
+まだリモートが無ければ:
+
+```bash
+gh repo create <名前> --private --source=. --push
+```
+
+テストが通らなければ配信しません。配属を決めるものなので、壊れたものが公開URLに
+出ないようにしています。
+
+計算はすべてブラウザの中で完結するので、公開しても入力ファイルがサーバに送られる
+ことはありません。ただしリポジトリを公開にすると `samples/` も公開されます
+（匿名の合成データだけですが、確認してから公開してください）。
+
 ```bash
 npm run typecheck
 npm test
@@ -176,4 +195,4 @@ GPA のファイルと教員ごとの裁量点のファイルは、同じ学生�
 - [x] **M1** ドメイン層（スコア計算 → `stableMatch` → 集計）とテスト
 - [x] **M2** UI 骨組み（ドラッグ＆ドロップ、パラメータ、結果表示、CSV 出力）
 - [ ] **M3** 実ファイルのパーサ（eClass テキスト / GPA Excel / 裁量点 Excel）
-- [ ] **M4** Excel 出力、安定性検証、統計表示、公開
+- [ ] **M4** Excel 出力、統計表示（安定性検証と公開の仕組みは済み）
