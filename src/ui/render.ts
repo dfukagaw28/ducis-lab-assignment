@@ -124,6 +124,11 @@ export function renderReport(
     </section>
 
     <h3>学生別</h3>
+    <p class="hint">
+      「抽選」は総合点が同点のときだけ効きます（1 点でも違えば結果に影響しません）。
+      番号は小さいほど優先で、0 が最も優先。全研究室で同じ番号を使うので、研究室に
+      よって有利不利が変わることはありません。
+    </p>
     <table><thead><tr>
       <th>学籍番号</th><th>氏名</th><th class="num">GPA</th><th class="num">抽選</th>
       <th>配属先</th><th class="num">希望</th><th class="num">総合点</th><th class="num">研究室での順位</th>
