@@ -86,9 +86,24 @@ const csvFiles: SourceFile[] = [
 const eclassFiles: SourceFile[] = [
   fromSamples("answer-utf8-sample.txt", "preferences"),
   { name: "GPA.xlsx", role: "gpa", text: "", rows: sheetRows("GPA.xlsx", "GPA") },
-  fromSamples("labs.csv", "labs"),
   ...["○○", "△△", "□□", "◇◇"].map(scoreSheet),
 ];
+
+/**
+ * 研究室一覧。samples/ には置いていない（無くても動くので）が、これを渡したときの
+ * 振る舞いも確かめたいので、ここで組み立てる。
+ */
+const labsCsv: SourceFile = {
+  name: "labs.csv",
+  role: "labs",
+  text: [
+    "研究室,研究室名,定員,選択肢ラベル,教員氏名",
+    "L01,○○研究室,3,○○研究室（○○　○○）,○○　○○",
+    "L02,△△研究室,3,△△研究室（△△　△△）,△△　△△",
+    "L03,□□研究室,3,□□研究室（□□　□□）,□□　□□",
+    "L04,◇◇研究室,3,◇◇研究室（◇◇　◇◇）,◇◇　◇◇",
+  ].join("\n"),
+};
 
 describe("guessRole", () => {
   it("ファイル名から種類を当てる", () => {
@@ -251,7 +266,7 @@ describe("buildInstance（eClass と Excel のファイルから）", () => {
   });
 
   it("選択肢ラベルの列が無ければ研究室名で突き合わせる", () => {
-    const byName = eclassFiles.map((file) =>
+    const byName = [...eclassFiles, labsCsv].map((file) =>
       file.role === "labs"
         ? {
             ...file,
@@ -268,7 +283,7 @@ describe("buildInstance（eClass と Excel のファイルから）", () => {
   });
 
   it("空白の入れ方が違っても突き合わせる", () => {
-    const spaced = eclassFiles.map((file) =>
+    const spaced = [...eclassFiles, labsCsv].map((file) =>
       file.role === "labs" ? { ...file, text: file.text.replace(/　/g, " ") } : file
     );
     const { instance } = buildInstance(spaced, SEED);
@@ -276,7 +291,7 @@ describe("buildInstance（eClass と Excel のファイルから）", () => {
   });
 
   it("割り切れないときは余りを配り、合計をちょうど学生数にする", () => {
-    const noCapacity = eclassFiles.map((file) =>
+    const noCapacity = [...eclassFiles, labsCsv].map((file) =>
       file.role === "labs"
         ? {
             ...file,
@@ -349,28 +364,27 @@ describe("buildInstance（eClass と Excel のファイルから）", () => {
     expect(instance.students.some((student) => student.id === "9999999999")).toBe(false);
   });
 
-  it("教員氏名が研究室一覧に無ければ、入れるべき列を言って止まる", () => {
+  it("研究室一覧に教員氏名の列も、括弧の中の教員氏名も無ければ、止まる", () => {
+    // 選択肢ラベルの括弧が教員氏名でない年（研究室の通称など）を想定する
     const noTeacher = [
-      ...eclassFiles.filter((file) => file.role !== "scores" && file.role !== "labs"),
+      ...eclassFiles.map((file) =>
+        file.role === "preferences"
+          ? { ...file, text: file.text.replace(/（○○　○○）/g, "（情報数理）") }
+          : file
+      ),
       {
-        ...eclassFiles.find((file) => file.role === "labs")!,
-        text: eclassFiles
-          .find((file) => file.role === "labs")!
-          .text.replace(",教員氏名", "")
-          .replace(/,[^,]*$/gm, ""),
-      },
-      {
-        name: "教員裁量点_○○先生.xlsx",
-        role: "scores" as const,
-        text: "",
-        rows: sheetRows("教員裁量点_○○先生.xlsx", "教員裁量点"),
+        ...labsCsv,
+        text: labsCsv.text
+          .replace(",教員氏名", "")
+          .replace(/,[^,]*$/gm, "")
+          .replace("○○研究室（○○　○○）", "○○研究室（情報数理）"),
       },
     ];
     expect(() => buildInstance(noTeacher, SEED)).toThrow(/教員氏名/);
   });
 
   it("研究室一覧が無くても、選択肢から研究室を読み取って配属できる", () => {
-    const noLabs = eclassFiles.filter((file) => file.role !== "labs");
+    const noLabs = eclassFiles;
     const { instance, warnings } = buildInstance(noLabs, SEED);
 
     expect(instance.labs).toHaveLength(4);
@@ -430,7 +444,7 @@ describe("buildInstance（eClass と Excel のファイルから）", () => {
   });
 
   it("突き合わせられない研究室があれば、その名前を言って止まる", () => {
-    const broken = eclassFiles.map((file) =>
+    const broken = [...eclassFiles, labsCsv].map((file) =>
       file.role === "labs" ? { ...file, text: file.text.replace("◇◇研究室（◇◇　◇◇）", "別名") } : file
     );
     expect(() => buildInstance(broken, SEED)).toThrow(/◇◇研究室（◇◇　◇◇）/);
@@ -438,7 +452,7 @@ describe("buildInstance（eClass と Excel のファイルから）", () => {
   });
 
   it("同じ名前の研究室が二つあれば止まる", () => {
-    const clashing = eclassFiles.map((file) =>
+    const clashing = [...eclassFiles, labsCsv].map((file) =>
       file.role === "labs"
         ? { ...file, text: file.text.replace("△△研究室（△△　△△）", "○○研究室（○○　○○）") }
         : file

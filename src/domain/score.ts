@@ -2,7 +2,8 @@
  * 総合点の計算と、そこから研究室の選好リストを作る処理。
  *
  * 総合点は「GPA 点 + 教員裁量点」で、GPA 点は全研究室で共通、裁量点は研究室ごと。
- * 研究室の選好は総合点の降順、同点なら抽選番号の小さい順。
+ * 研究室の選好は、希望順位を出した学生を先に、その中で総合点の降順、同点なら
+ * 抽選番号の小さい順。
  *
  * 総合点の水準を研究室どうしで揃える必要はない。マッチングが使うのは研究室の
  * 中での順序だけなので、ある研究室が全員に高い裁量点を付けても結果は変わらない。
@@ -16,6 +17,8 @@ export interface ScoredStudent {
   discretionaryPoint: number;
   total: number;
   lottery: number;
+  /** 希望順位を一つでも出したか。出していない学生は全研究室で後回しになる。 */
+  submitted: boolean;
 }
 
 /** 学生 s の GPA 点（全研究室で共通）。 */
@@ -25,7 +28,12 @@ export function gpaPoint(student: Student, params: Params): number {
 }
 
 /**
- * 研究室 lab における学生の並び。総合点の降順、同点なら抽選番号の昇順。
+ * 研究室 lab における学生の並び。
+ *
+ * 希望順位を出した学生を先に置き、その中で総合点の降順、同点なら抽選番号の昇順。
+ * どの研究室も提出者を未提出者より上に見るので、提出しなかった学生が提出した学生を
+ * 押しのけることはない。安定マッチングの性質から、これは「提出者が収まった後の空きに
+ * 未提出者が入る」ことを意味する（そうでなければブロッキングペアができる）。
  *
  * 裁量点が無い学生は、missingScore が "unacceptable" なら並びから外れる
  * （その研究室に配属されない）。
@@ -58,10 +66,14 @@ export function rankStudents(
       discretionaryPoint: discretionary,
       total: gpa + discretionary,
       lottery: number,
+      submitted: student.preferences.length > 0,
     });
   }
 
-  scored.sort((a, b) => b.total - a.total || a.lottery - b.lottery);
+  scored.sort(
+    (a, b) =>
+      Number(b.submitted) - Number(a.submitted) || b.total - a.total || a.lottery - b.lottery
+  );
   return scored;
 }
 

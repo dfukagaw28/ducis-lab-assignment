@@ -102,6 +102,24 @@ describe("希望が不完全なときの配属", () => {
     expect(report.summary.unlisted).toBeGreaterThanOrEqual(1);
   });
 
+  it("未提出の学生が、希望を出した学生を押しのけない", () => {
+    // s2 は希望を出していない。s2 の入った研究室を、それより上に望んでいた
+    // 提出者がいてはならない（いれば、その研究室は s2 よりその学生を採る）
+    const s2 = report.students.find((row) => row.id === "s2")!;
+    expect(s2.lab).not.toBeNull();
+
+    for (const row of report.students) {
+      const student = students.find((entry) => entry.id === row.id)!;
+      if (student.preferences.length === 0) continue;
+
+      const wanted = student.preferences.indexOf(s2.lab!);
+      if (wanted < 0) continue;
+      const got = row.lab === null ? -1 : student.preferences.indexOf(row.lab);
+      expect(got).toBeGreaterThanOrEqual(0);
+      expect(got).toBeLessThan(wanted);
+    }
+  });
+
   it("希望外の配属をブロッキングペアとして数え上げない", () => {
     expect(report.summary.blockingPairs).toEqual([]);
   });
