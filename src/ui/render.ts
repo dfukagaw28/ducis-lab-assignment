@@ -56,6 +56,11 @@ export function renderReport(
       (lab) => `<tr>
         <td>${escapeHtml(lab.name ?? lab.id)}</td>
         <td class="num">${lab.filled} / ${lab.capacity}</td>
+        <td class="num">${
+          lab.cutoff === null
+            ? '<span class="hint">なし</span>'
+            : lab.cutoff.toFixed(1)
+        }</td>
         <td>${lab.students.map((id) => `<code>${escapeHtml(id)}</code>`).join(" ")}</td>
       </tr>`
     )
@@ -92,7 +97,14 @@ export function renderReport(
       <tbody>${distribution}</tbody></table>
 
     <h3>研究室別</h3>
-    <table><thead><tr><th>研究室</th><th class="num">配属 / 定員</th><th>学生</th></tr></thead>
+    <p class="hint">
+      合格ラインは、希望を出した学生がその研究室に入るのに要した総合点。定員に空きが
+      あるか、希望を出さなかった学生が入っている研究室には線がありません（希望すれば
+      入れたということなので「なし」）。
+    </p>
+    <table><thead><tr>
+      <th>研究室</th><th class="num">配属 / 定員</th><th class="num">合格ライン</th><th>学生</th>
+    </tr></thead>
       <tbody>${labRows}</tbody></table>
 
     <h3>学生別</h3>
