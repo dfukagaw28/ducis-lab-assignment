@@ -17,7 +17,10 @@ export interface StudentRow {
   listed: boolean;
   /** 配属先での総合点。未配属なら null */
   total: number | null;
-  /** 配属先での順位（1 始まり）。未配属なら null */
+  /**
+   * 配属先の研究室が付けた順位（1 始まり、その研究室が点を付けた全学生の中で）。
+   * 「配属された学生の中で何番目か」ではない。未配属なら null。
+   */
   rankInLab: number | null;
 }
 

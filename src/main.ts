@@ -16,7 +16,15 @@ import {
   type Params,
 } from "./domain/types.js";
 import { sampleInstance } from "./dev/sampleInstance.js";
-import { downloadCsv, labsCsv, outputFileName, studentsCsv, summaryCsv } from "./io/export.js";
+import {
+  downloadCsv,
+  downloadWorkbook,
+  labsCsv,
+  outputFileName,
+  resultWorkbook,
+  studentsCsv,
+  summaryCsv,
+} from "./io/export.js";
 import { buildInstance } from "./io/intake.js";
 import { createDropZone, message } from "./ui/dropzone.js";
 import { renderMessages, renderReport } from "./ui/render.js";
@@ -120,6 +128,17 @@ output.addEventListener("click", (event) => {
   if (button === null || latest === null) return;
   const { instance, report, params } = latest;
   const kind = button.dataset["download"]!;
+
+  if (kind === "workbook") {
+    void resultWorkbook(instance, report, params)
+      .then((bytes) => downloadWorkbook(outputFileName("result", params.seed, "xlsx"), bytes))
+      .catch((cause: unknown) => {
+        errorBox.textContent = `Excel を作れませんでした: ${message(cause)}`;
+        errorBox.hidden = false;
+      });
+    return;
+  }
+
   const csv =
     kind === "students"
       ? studentsCsv(instance, report)

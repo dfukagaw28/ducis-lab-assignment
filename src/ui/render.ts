@@ -81,6 +81,7 @@ export function renderReport(
     ${stability}
 
     <div class="row" id="downloads">
+      <button type="button" class="primary" data-download="workbook">Excel（3 シート）</button>
       <button type="button" data-download="students">学生別 CSV</button>
       <button type="button" data-download="labs">研究室別 CSV</button>
       <button type="button" data-download="summary">サマリ CSV</button>
@@ -97,7 +98,7 @@ export function renderReport(
     <h3>学生別</h3>
     <table><thead><tr>
       <th>学籍番号</th><th>氏名</th><th class="num">GPA</th><th class="num">抽選</th>
-      <th>配属先</th><th class="num">希望</th><th class="num">総合点</th><th class="num">室内順位</th>
+      <th>配属先</th><th class="num">希望</th><th class="num">総合点</th><th class="num">研究室での順位</th>
     </tr></thead><tbody>${studentRows}</tbody></table>
   `;
 }
