@@ -34,7 +34,9 @@ describe("page", () => {
     expect(output.textContent).toContain("サンプルデータ（合成、実ファイルではありません）");
     expect(output.querySelectorAll("table").length).toBeGreaterThanOrEqual(3);
     expect(output.textContent).toContain("ブロッキングペアはありません");
-    expect(output.querySelectorAll("[data-download]")).toHaveLength(3);
+    // Excel 1 つと CSV 3 つ
+    expect(output.querySelectorAll("[data-download]")).toHaveLength(4);
+    expect(output.querySelector('[data-download="workbook"]')).not.toBeNull();
 
     const seed = app.querySelector<HTMLInputElement>("#seed")!;
     expect(output.textContent).toContain(seed.value);
