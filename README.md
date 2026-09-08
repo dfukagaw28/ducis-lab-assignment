@@ -6,6 +6,9 @@
 マッチングには [`hospital-resident-matching`](https://github.com/dfukagaw28/hospital-resident-matching)
 の `stableMatch()`（学生側最適の受入保留アルゴリズム）を使います。
 
+**使う → https://dfukagaw28.github.io/ducis-lab-assignment/**
+（インストール不要。ファイルはブラウザの外に出ません）
+
 設計は [DESIGN.md](DESIGN.md) を参照してください。
 
 ## 動かす
@@ -31,6 +34,8 @@ npm test
 ## 公開する
 
 ビルドしたアプリは GitHub Pages で配信されます。
+
+**https://dfukagaw28.github.io/ducis-lab-assignment/**
 
 計算はすべてブラウザの中で完結するので、公開しても入力ファイルがサーバに送られる
 ことはありません。ただしリポジトリを公開にすると `samples/` も公開されます
