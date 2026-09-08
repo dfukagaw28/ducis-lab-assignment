@@ -24,9 +24,9 @@ const files: SourceFile[] = [
   },
   { name: "GPA.xlsx", role: "gpa", text: "", rows: sheetRows("GPA.xlsx", "GPA") },
   {
-    name: "eclass-labs.csv",
+    name: "labs.csv",
     role: "labs",
-    text: readFileSync(resolve("samples", "eclass-labs.csv"), "utf8"),
+    text: readFileSync(resolve("samples", "labs.csv"), "utf8"),
   },
   ...["○○", "△△", "□□", "◇◇"].map((teacher) => ({
     name: `教員裁量点_${teacher}先生.xlsx`,
