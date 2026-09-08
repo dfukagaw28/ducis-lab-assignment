@@ -19,7 +19,7 @@ export function createDropZone(root: HTMLElement): DropZone {
   root.innerHTML = `
     <div id="drop" class="drop">
       <p>入力ファイルをここにドロップ<span class="hint">（クリックして選ぶこともできます）</span></p>
-      <p class="hint">CSV・Excel (.xlsx)・eClass の書き出し (.txt)</p>
+      <p class="hint">CSV・Excel (.xlsx)・e-class の書き出し (.txt)</p>
       <input id="picker" type="file" multiple accept=".csv,.txt,.xlsx" hidden />
     </div>
     <p id="dropError" class="error" hidden></p>

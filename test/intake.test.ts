@@ -25,7 +25,7 @@ function scoreSheet(teacher: string): SourceFile {
 }
 
 /**
- * 暫定 CSV 形式の一式。samples/ には eClass と Excel の見本しか置いていないので、
+ * 暫定 CSV 形式の一式。samples/ には e-class と Excel の見本しか置いていないので、
  * この形式の確かめはここで組み立てる。
  */
 const csvFiles: SourceFile[] = [
@@ -82,7 +82,7 @@ const csvFiles: SourceFile[] = [
   })),
 ];
 
-/** eClass の書き出しと Excel の一式（samples/ にあるもの）。 */
+/** e-class の書き出しと Excel の一式（samples/ にあるもの）。 */
 const eclassFiles: SourceFile[] = [
   fromSamples("answer-utf8-sample.txt", "preferences"),
   { name: "GPA.xlsx", role: "gpa", text: "", rows: sheetRows("GPA.xlsx", "GPA") },
@@ -217,7 +217,7 @@ describe("buildInstance", () => {
   });
 });
 
-describe("buildInstance（eClass と Excel のファイルから）", () => {
+describe("buildInstance（e-class と Excel のファイルから）", () => {
   it("暫定 CSV でなくても、そうと見分けて読む", () => {
     const { instance } = buildInstance(eclassFiles, SEED);
     // 回答したのは 9 人。名簿（GPA）にはもう 1 人いる

@@ -40,7 +40,7 @@ export interface LabRow {
   name?: string;
   /** 定員。列が無いか空欄なら null。既定値を入れるのは intake.ts の役目。 */
   capacity: number | null;
-  /** eClass の選択肢ラベル。希望順位ファイルの研究室名と突き合わせるのに使う。 */
+  /** e-class の選択肢ラベル。希望順位ファイルの研究室名と突き合わせるのに使う。 */
   label?: string;
   /** 教員氏名。教員ごとの裁量点ファイルと突き合わせるのに使う。 */
   teacher?: string;
@@ -125,7 +125,7 @@ export function parseGpaRows(rows: readonly string[][]): GpaRow[] {
 /**
  * `研究室` の一覧。`研究室名`・`定員`・`選択肢ラベル` は任意。
  *
- * 選択肢ラベルは eClass の希望順位ファイルが研究室を指す文字列
+ * 選択肢ラベルは e-class の希望順位ファイルが研究室を指す文字列
  * （`○○研究室（○○　○○）` など）。無ければ研究室名か研究室 ID で突き合わせる。
  *
  * 定員は無ければ null にしておく。全研究室で無ければ学生数から割り出す
