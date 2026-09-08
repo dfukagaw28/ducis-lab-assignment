@@ -9,7 +9,9 @@ export function renderReport(
   instance: Instance,
   report: Report,
   /** 何から出した結果なのか。取り違えに気づけるよう、結果と一緒に出す。 */
-  source: string
+  source: string,
+  /** 抽選シードをどう決めたか。手で指定したなら、それが結果に残る。 */
+  seedSource: string
 ): void {
   const { summary } = report;
   const labName = new Map(instance.labs.map((lab) => [lab.id, lab.name ?? lab.id]));
@@ -70,7 +72,9 @@ export function renderReport(
     <h2>結果</h2>
     <p class="source">入力: ${escapeHtml(source)}</p>
     <dl class="stats">
-      <div><dt>抽選シード</dt><dd><code>${summary.seed}</code></dd></div>
+      <div><dt>抽選シード</dt>
+        <dd><code>${summary.seed}</code>
+          <span class="hint">${escapeHtml(seedSource)}</span></dd></div>
       <div><dt>学生</dt><dd>${summary.numStudents} 人</dd></div>
       <div><dt>研究室</dt><dd>${summary.numLabs} 室（定員計 ${summary.totalCapacity}）</dd></div>
       <div><dt>配属</dt><dd>${summary.matched} 人</dd></div>

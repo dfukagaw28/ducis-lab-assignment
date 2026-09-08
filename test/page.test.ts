@@ -11,9 +11,10 @@ describe("page", () => {
     app = document.querySelector<HTMLElement>("#app")!;
   });
 
-  it("読み込み時にシードを引き、入力の受け口を出す", () => {
+  it("シードは既定で手入力できない（入力データから導く）", () => {
     const seed = app.querySelector<HTMLInputElement>("#seed")!;
-    expect(Number(seed.value)).toBeGreaterThanOrEqual(0);
+    expect(seed.disabled).toBe(true);
+    expect(app.querySelector<HTMLButtonElement>("#reseed")!.disabled).toBe(true);
     expect(app.querySelector("#drop")).not.toBeNull();
     expect(app.querySelector("#output")!.innerHTML).toBe("");
   });
@@ -39,17 +40,35 @@ describe("page", () => {
     expect(output.querySelector('[data-download="workbook"]')).not.toBeNull();
 
     const seed = app.querySelector<HTMLInputElement>("#seed")!;
+    // 導いたシードが欄に入り、結果にも出る
+    expect(Number(seed.value)).toBeGreaterThan(0);
     expect(output.textContent).toContain(seed.value);
+    expect(output.textContent).toContain("入力データから導出");
     expect(app.querySelector<HTMLElement>("#error")!.hidden).toBe(true);
   });
 
-  it("引き直すとシードが変わり、結果に反映される", () => {
+  it("同じ入力なら導かれるシードも同じ", () => {
     const seed = app.querySelector<HTMLInputElement>("#seed")!;
     const before = seed.value;
-    app.querySelector<HTMLButtonElement>("#reseed")!.click();
+    app.querySelector<HTMLButtonElement>("#useSample")!.click();
+    expect(seed.value).toBe(before);
+  });
 
+  it("手で指定に切り替えると引き直せるようになり、そのことが結果に残る", () => {
+    const seed = app.querySelector<HTMLInputElement>("#seed")!;
+    const manual = app.querySelector<HTMLInputElement>("#manualSeed")!;
+    const before = seed.value;
+
+    manual.checked = true;
+    manual.dispatchEvent(new Event("change"));
+    expect(seed.disabled).toBe(false);
+
+    app.querySelector<HTMLButtonElement>("#reseed")!.click();
     expect(seed.value).not.toBe(before);
-    expect(app.querySelector<HTMLElement>("#output")!.textContent).toContain(seed.value);
+
+    const output = app.querySelector<HTMLElement>("#output")!;
+    expect(output.textContent).toContain(seed.value);
+    expect(output.textContent).toContain("手で指定");
   });
 
   it("希望順位の内訳に帯を添える", () => {
