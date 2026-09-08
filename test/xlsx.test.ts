@@ -10,8 +10,8 @@ function open(name: string) {
   return readWorkbook(new Uint8Array(readFileSync(resolve("samples", name))));
 }
 
-describe("readWorkbook（テンプレート）", () => {
-  const workbook = open("教員裁量点_●●先生（template）.xlsx");
+describe("readWorkbook（教員裁量点）", () => {
+  const workbook = open("教員裁量点_○○先生.xlsx");
 
   it("シートを名前つきで並べる", () => {
     expect(workbook.sheets.map((sheet) => sheet.name)).toEqual(["教員裁量点", "教員氏名リスト"]);
@@ -34,12 +34,6 @@ describe("readWorkbook（テンプレート）", () => {
     expect(rows[10]!.slice(0, 2)).toEqual(["1234560010", "伊藤　ヌル"]);
   });
 
-  it("テンプレートの点数欄は空", () => {
-    for (const row of sheetOf(workbook, "教員裁量点").rows.slice(1)) {
-      expect(row[3] ?? "").toBe("");
-    }
-  });
-
   it("教員氏名リストのシートも読める", () => {
     const rows = sheetOf(workbook, "教員氏名リスト").rows;
     expect(rows[0]).toEqual(["教員氏名リスト"]);
@@ -60,7 +54,21 @@ describe("readWorkbook（テンプレート）", () => {
   });
 });
 
-describe("readWorkbook（記入済み）", () => {
+describe("readWorkbook（GPA）", () => {
+  const rows = sheetOf(open("GPA.xlsx"), "GPA").rows;
+
+  it("見出しと学生の行を読む", () => {
+    expect(rows[0]).toEqual(["学生ID", "学生氏名", "GPA"]);
+    expect(rows).toHaveLength(11);
+    expect(rows[1]).toEqual(["1234560001", "田中　ダミー", "3.97"]);
+  });
+
+  it("シートが 1 つだけなら、それが最初のシート", () => {
+    expect(sheetOf(open("GPA.xlsx")).name).toBe("GPA");
+  });
+});
+
+describe("readWorkbook（記入済みの中身）", () => {
   const rows = sheetOf(open("教員裁量点_○○先生.xlsx"), "教員裁量点").rows;
 
   it("教員氏名と裁量点が入っている", () => {

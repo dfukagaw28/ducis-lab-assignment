@@ -54,6 +54,31 @@ describe("rankStudents", () => {
     expect(ranked.map((entry) => entry.id)).toEqual(["b", "a"]);
   });
 
+  it("希望順位を出していない学生を、点数にかかわらず後ろに置く", () => {
+    // b は最高点だが希望を一つも出していない
+    const withAbsent: Student[] = [
+      { id: "a", gpa: 4.0, preferences: ["L"] },
+      { id: "b", gpa: 2.0, preferences: [] },
+      { id: "c", gpa: 3.0, preferences: ["L"] },
+    ];
+    const ranked = rankStudents(lab({ a: 0, b: 60, c: 30 }), withAbsent, params, lottery);
+    expect(ranked.map((entry) => entry.id)).toEqual(["c", "a", "b"]);
+    // b の総合点は 80 で最高のまま。順序だけが後ろになる
+    expect(ranked[2]!.total).toBe(80);
+    expect(ranked[2]!.submitted).toBe(false);
+  });
+
+  it("未提出者どうしは今まで通り総合点で並べる", () => {
+    const allAbsent: Student[] = students.map((student) => ({ ...student, preferences: [] }));
+    const ranked = rankStudents(lab({ a: 0, b: 60, c: 30 }), allAbsent, params, lottery);
+    expect(ranked.map((entry) => entry.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("一部だけ順位を付けた学生は提出者として扱う", () => {
+    const partial: Student[] = [{ id: "a", gpa: 4.0, preferences: ["L"] }];
+    expect(rankStudents(lab({ a: 0 }), partial, params, lottery)[0]!.submitted).toBe(true);
+  });
+
   it("研究室が裁量点を一律に高くしても順序は変わらない", () => {
     const modest = rankStudents(lab({ a: 10, b: 20, c: 30 }), students, params, lottery);
     const generous = rankStudents(lab({ a: 40, b: 50, c: 60 }), students, params, lottery);
