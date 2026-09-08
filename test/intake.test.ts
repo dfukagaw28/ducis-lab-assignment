@@ -134,6 +134,13 @@ describe("buildInstance", () => {
     expect(() => buildInstance(csvFiles.filter((file) => file.role !== "scores"), SEED)).toThrow(/裁量点/);
   });
 
+  it("研究室一覧が無ければ、希望順位に出てくる研究室を集める", () => {
+    const noLabs = csvFiles.filter((file) => file.role !== "labs");
+    const { instance, warnings } = buildInstance(noLabs, SEED);
+    expect(instance.labs.map((lab) => lab.name)).toEqual(["L01", "L02", "L03", "L04"]);
+    expect(warnings.join()).toMatch(/研究室・定員のファイルが無いので、希望順位から 4 室/);
+  });
+
   it("同じ種類が二つあれば拒む", () => {
     expect(() => buildInstance([...csvFiles, csvFiles.find((file) => file.role === "gpa")!], SEED)).toThrow(/2 個/);
   });
@@ -360,6 +367,66 @@ describe("buildInstance（eClass と Excel のファイルから）", () => {
       },
     ];
     expect(() => buildInstance(noTeacher, SEED)).toThrow(/教員氏名/);
+  });
+
+  it("研究室一覧が無くても、選択肢から研究室を読み取って配属できる", () => {
+    const noLabs = eclassFiles.filter((file) => file.role !== "labs");
+    const { instance, warnings } = buildInstance(noLabs, SEED);
+
+    expect(instance.labs).toHaveLength(4);
+    // 選択肢の番号の順に L01… を振り、括弧の前を研究室名にする
+    expect(instance.labs.map((lab) => lab.id)).toEqual(["L01", "L02", "L03", "L04"]);
+    expect(instance.labs.map((lab) => lab.name)).toEqual([
+      "○○研究室",
+      "△△研究室",
+      "□□研究室",
+      "◇◇研究室",
+    ]);
+    expect(warnings.join()).toMatch(/希望順位から 4 室/);
+
+    // 選択肢ラベルの括弧の中を教員氏名とみて、裁量点のファイルと繋がる
+    expect(instance.labs.every((lab) => lab.scores.size === 10)).toBe(true);
+    const taro = instance.students.find((student) => student.id === "1234560002")!;
+    expect(taro.preferences).toEqual(["L04", "L01", "L03", "L02"]);
+  });
+
+  it("誰も挙げなかった研究室も選択肢から拾う", () => {
+    // 回答から option4 を抜く。選択肢の行はそのままなので、研究室は 4 つ残る
+    const noFourth = eclassFiles
+      .filter((file) => file.role !== "labs")
+      .map((file) =>
+        file.role === "preferences"
+          ? {
+              ...file,
+              text: file.text.replace(
+                /"([\d,\s]*\d)"/g,
+                (_, list: string) =>
+                  `"${list
+                    .split(",")
+                    .map((value) => value.trim())
+                    .filter((value) => value !== "4")
+                    .join(", ")}"`
+              ),
+            }
+          : file
+      );
+    const { instance } = buildInstance(noFourth, SEED);
+
+    expect(instance.labs).toHaveLength(4);
+    // 希望順位から集めていたら、誰も挙げていない L04 は落ちてしまう
+    expect(instance.labs.map((lab) => lab.id)).toContain("L04");
+    expect(instance.students.every((student) => !student.preferences.includes("L04"))).toBe(true);
+  });
+
+  it("括弧の中が教員氏名でなければ、入れるべき列を言って止まる", () => {
+    const renamed = eclassFiles
+      .filter((file) => file.role !== "labs")
+      .map((file) =>
+        file.role === "preferences"
+          ? { ...file, text: file.text.replace(/（○○　○○）/g, "（別の人）") }
+          : file
+      );
+    expect(() => buildInstance(renamed, SEED)).toThrow(/教員氏名/);
   });
 
   it("突き合わせられない研究室があれば、その名前を言って止まる", () => {

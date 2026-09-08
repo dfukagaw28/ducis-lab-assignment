@@ -8,13 +8,14 @@
 import { tightCapacities } from "../domain/capacity.js";
 import type { Instance, Lab, LabId, Student, StudentId } from "../domain/types.js";
 import { parseCsv } from "./csv.js";
-import { looksLikeEclass, parseEclassPreferences } from "./eclass.js";
+import { looksLikeEclass, parseEclass } from "./eclass.js";
 import {
   parseGpaRows,
   parseLabRows,
   parsePreferenceRows,
   parseScoreRows,
   type LabRow,
+  type PreferenceRow,
 } from "./parsers.js";
 
 export const ROLES = ["preferences", "gpa", "labs", "scores"] as const;
@@ -61,21 +62,27 @@ export function guessRole(fileName: string): FileRole {
  * `seed` は定員の指定が無いときの割り当てに使う（余りの席をどの研究室に渡すか）。
  */
 export function buildInstance(files: readonly SourceFile[], seed: number): Built {
-  const only = (role: FileRole): SourceFile => {
+  const optional = (role: FileRole): SourceFile | undefined => {
     const found = files.filter((file) => file.role === role);
-    if (found.length === 0) throw new Error(`${ROLE_LABELS[role]}のファイルがありません`);
     if (found.length > 1) {
       throw new Error(`${ROLE_LABELS[role]}のファイルが ${found.length} 個あります`);
     }
-    return found[0]!;
+    return found[0];
+  };
+  const only = (role: FileRole): SourceFile => {
+    const found = optional(role);
+    if (found === undefined) throw new Error(`${ROLE_LABELS[role]}のファイルがありません`);
+    return found;
   };
 
   const preferenceFile = only("preferences");
-  const preferenceRows = inFile(preferenceFile, () =>
+  const eclass = inFile(preferenceFile, () =>
     preferenceFile.rows === undefined && looksLikeEclass(preferenceFile.text)
-      ? parseEclassPreferences(preferenceFile.text)
-      : parsePreferenceRows(rowsOf(preferenceFile))
+      ? parseEclass(preferenceFile.text)
+      : null
   );
+  const preferenceRows =
+    eclass?.rows ?? inFile(preferenceFile, () => parsePreferenceRows(rowsOf(preferenceFile)));
 
   const gpaFile = only("gpa");
   const gpaRows = inFile(gpaFile, () => parseGpaRows(rowsOf(gpaFile)));
@@ -85,13 +92,17 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
     gpaRows.filter((row) => row.name !== undefined).map((row) => [row.id, row.name!])
   );
 
-  const labFile = only("labs");
-  const labRows = inFile(labFile, () => parseLabRows(rowsOf(labFile)));
-
   const scoreFiles = files.filter((file) => file.role === "scores");
   if (scoreFiles.length === 0) throw new Error("教員裁量点のファイルがありません");
 
   const warnings: string[] = [];
+
+  // 研究室一覧のファイルは任意。無ければ希望順位から研究室を読み取る。
+  const labFile = optional("labs");
+  const labRows =
+    labFile === undefined
+      ? deriveLabs(eclass?.labels ?? null, preferenceRows, warnings)
+      : inFile(labFile, () => parseLabRows(rowsOf(labFile)));
 
   const labIds = new Set(labRows.map((row) => row.id));
   if (labIds.size !== labRows.length) throw new Error("研究室が重複しています");
@@ -247,6 +258,54 @@ function resolveCapacities(
   return capacities;
 }
 
+/**
+ * 研究室一覧のファイルが無いときに、研究室を割り出す。
+ *
+ * eClass の書き出しなら選択肢がそのまま研究室の全体像なので、それを使う。誰も
+ * 挙げなかった研究室も選択肢には並んでいるので落とさない。暫定 CSV なら希望順位に
+ * 現れた研究室を集めるしかない。
+ *
+ * 定員は決めずに置いておく（`resolveCapacities` が合計を学生数に合わせる）。
+ */
+function deriveLabs(
+  labels: ReadonlyMap<number, string> | null,
+  preferenceRows: readonly PreferenceRow[],
+  warnings: string[]
+): LabRow[] {
+  const found =
+    labels !== null
+      ? [...labels].sort(([a], [b]) => a - b).map(([, label]) => label)
+      : [...new Set(preferenceRows.flatMap((row) => row.preferences))].sort();
+
+  if (found.length === 0) {
+    throw new Error("研究室・定員のファイルが無く、希望順位からも研究室を読み取れません");
+  }
+
+  warnings.push(
+    `研究室・定員のファイルが無いので、希望順位から ${found.length} 室を読み取りました` +
+      `（${found.join("、")}）`
+  );
+
+  return found.map((label, index) => ({
+    id: `L${String(index + 1).padStart(2, "0")}`,
+    name: shortName(label),
+    capacity: null,
+    label,
+  }));
+}
+
+/** `○○研究室（○○　○○）` を `○○研究室` に。括弧が無ければそのまま。 */
+function shortName(label: string): string {
+  const at = label.search(/[（(]/);
+  return at <= 0 ? label : label.slice(0, at).trim();
+}
+
+/** `○○研究室（○○　○○）` の括弧の中。無ければ undefined。 */
+function inParentheses(label: string | undefined): string | undefined {
+  const match = label === undefined ? null : /[（(]([^）)]+)[）)]\s*$/.exec(label);
+  return match === null ? undefined : match[1]!.trim();
+}
+
 /** 研究室一覧 CSV の列の見出し（エラーで案内するため）。 */
 const LABEL_COLUMN = "選択肢ラベル";
 const TEACHER_COLUMN = "教員氏名";
@@ -330,6 +389,9 @@ function labLookup(labRows: readonly LabRow[]): Map<string, LabId> {
     add(row.name, row.id);
     add(row.label, row.id);
     add(row.teacher, row.id);
+    // 選択肢ラベルが `○○研究室（○○　○○）` なら、括弧の中は教員氏名のはず。
+    // 教員氏名の列が無くても裁量点のファイルと繋がるように、それも鍵にする。
+    if (row.teacher === undefined) add(inParentheses(row.label), row.id);
   }
   return lookup;
 }
