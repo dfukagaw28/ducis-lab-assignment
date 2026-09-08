@@ -57,7 +57,17 @@ const csvFiles: SourceFile[] = [
       )
       .join("\n"),
   },
-  fromSamples("labs.csv", "labs"),
+  {
+    name: "labs.csv",
+    role: "labs",
+    text: [
+      "研究室,研究室名,定員",
+      "L01,情報数理,3",
+      "L02,知能情報,3",
+      "L03,計算機科学,3",
+      "L04,データ科学,3",
+    ].join("\n"),
+  },
   ...["L01", "L02", "L03", "L04"].map((lab, index) => ({
     name: `scores_${lab}.csv`,
     role: "scores" as const,
@@ -76,7 +86,7 @@ const csvFiles: SourceFile[] = [
 const eclassFiles: SourceFile[] = [
   fromSamples("answer-utf8-sample.txt", "preferences"),
   { name: "GPA.xlsx", role: "gpa", text: "", rows: sheetRows("GPA.xlsx", "GPA") },
-  fromSamples("eclass-labs.csv", "labs"),
+  fromSamples("labs.csv", "labs"),
   ...["○○", "△△", "□□", "◇◇"].map(scoreSheet),
 ];
 
