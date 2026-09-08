@@ -6,6 +6,7 @@
  */
 
 import { tightCapacities } from "../domain/capacity.js";
+import { seedFromInput } from "../domain/seed.js";
 import type { Instance, Lab, LabId, Student, StudentId } from "../domain/types.js";
 import { parseCsv } from "./csv.js";
 import { looksLikeEclass, parseEclass } from "./eclass.js";
@@ -42,6 +43,8 @@ export interface SourceFile {
 
 export interface Built {
   instance: Instance;
+  /** 使った抽選シード。渡されなければ入力データから導いたもの。 */
+  seed: number;
   /** 計算はできるが目を通してほしいこと */
   warnings: string[];
 }
@@ -59,9 +62,10 @@ export function guessRole(fileName: string): FileRole {
 /**
  * 読み込んだファイルからインスタンスを組み立てる。
  *
- * `seed` は定員の指定が無いときの割り当てに使う（余りの席をどの研究室に渡すか）。
+ * `seed` を渡さなければ、入力データから導く（`domain/seed.ts`）。人が選べると
+ * 結果を見てから選び直した疑いが残るので、既定はこちら。
  */
-export function buildInstance(files: readonly SourceFile[], seed: number): Built {
+export function buildInstance(files: readonly SourceFile[], seed?: number): Built {
   const optional = (role: FileRole): SourceFile | undefined => {
     const found = files.filter((file) => file.role === role);
     if (found.length > 1) {
@@ -194,7 +198,15 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
 
   checkRoster(students, scores, scoreSources, warnings);
 
-  const capacities = resolveCapacities(labRows, students, seed, warnings);
+  // 定員はシードから決まることがあるので、シードは定員を決める前の入力から導く
+  const drawSeed =
+    seed ??
+    seedFromInput(
+      students,
+      labRows.map((row) => ({ id: row.id, capacity: row.capacity, scores: scores.get(row.id)! }))
+    );
+
+  const capacities = resolveCapacities(labRows, students, drawSeed, warnings);
   const labs: Lab[] = labRows.map((row) => ({
     id: row.id,
     ...(row.name === undefined ? {} : { name: row.name }),
@@ -210,7 +222,7 @@ export function buildInstance(files: readonly SourceFile[], seed: number): Built
     );
   }
 
-  return { instance: { students, labs }, warnings };
+  return { instance: { students, labs }, seed: drawSeed, warnings };
 }
 
 /**

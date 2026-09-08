@@ -38,6 +38,7 @@ const files: SourceFile[] = [
 ];
 
 const SEED = 20260906;
+const SEED_SOURCE = "手で指定";
 const params: Params = { ...defaultParams, seed: SEED };
 const { instance } = buildInstance(files, SEED);
 const report = buildReport(instance, assign(instance, params));
@@ -89,10 +90,11 @@ describe("labsCsv", () => {
 });
 
 describe("summaryCsv", () => {
-  const text = summaryCsv(report, params);
+  const text = summaryCsv(report, params, SEED_SOURCE);
 
   it("再現に要るパラメータを残す", () => {
     expect(text).toContain(`抽選シード,${params.seed}`);
+    expect(text).toContain("シードの決め方,手で指定");
     expect(text).toContain(`GPA 配点,${params.gpaWeight}`);
     expect(text).toContain(`裁量点 配点,${params.discretionaryWeight}`);
   });
@@ -105,7 +107,7 @@ describe("summaryCsv", () => {
 
 describe("resultWorkbook", () => {
   it("3 つの表を 1 冊にまとめる", async () => {
-    const bytes = await resultWorkbook(instance, report, params);
+    const bytes = await resultWorkbook(instance, report, params, SEED_SOURCE);
     const workbook = readWorkbook(bytes);
     expect(workbook.sheets.map((sheet) => sheet.name)).toEqual([
       "学生別",
@@ -115,13 +117,13 @@ describe("resultWorkbook", () => {
   });
 
   it("CSV と同じ中身を持つ", async () => {
-    const workbook = readWorkbook(await resultWorkbook(instance, report, params));
+    const workbook = readWorkbook(await resultWorkbook(instance, report, params, SEED_SOURCE));
     const asText = (rows: string[][]) => rows.map((row) => row.join("|")).join("\n");
 
     for (const [name, csv] of [
       ["学生別", studentsCsv(instance, report)],
       ["研究室別", labsCsv(instance, report)],
-      ["サマリ", summaryCsv(report, params)],
+      ["サマリ", summaryCsv(report, params, SEED_SOURCE)],
     ] as const) {
       // 空欄は書き出さないので、読み戻すと末尾の空欄が落ちる。そこだけ揃える
       const fromCsv = parseCsv(csv).map((row) => [...row]);
@@ -137,7 +139,7 @@ describe("resultWorkbook", () => {
   });
 
   it("数値は数値のまま入れる（Excel で集計できるように）", async () => {
-    const workbook = readWorkbook(await resultWorkbook(instance, report, params));
+    const workbook = readWorkbook(await resultWorkbook(instance, report, params, SEED_SOURCE));
     const rows = sheetOf(workbook, "学生別").rows;
     // GPA の列。文字列として入れていると Excel では計算できない
     expect(Number(rows[1]![2])).toBeGreaterThan(0);

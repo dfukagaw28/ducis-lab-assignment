@@ -16,8 +16,8 @@ export function labsCsv(instance: Instance, report: Report): string {
   return toCsv(labRows(instance, report));
 }
 
-export function summaryCsv(report: Report, params: Params): string {
-  return toCsv(summaryRows(report, params));
+export function summaryCsv(report: Report, params: Params, seedSource: string): string {
+  return toCsv(summaryRows(report, params, seedSource));
 }
 
 /**
@@ -29,13 +29,14 @@ export function summaryCsv(report: Report, params: Params): string {
 export async function resultWorkbook(
   instance: Instance,
   report: Report,
-  params: Params
+  params: Params,
+  seedSource: string
 ): Promise<Uint8Array> {
   const { writeWorkbook } = await import("./xlsxWrite.js");
   return writeWorkbook([
     { name: "学生別", rows: studentRows(instance, report) },
     { name: "研究室別", rows: labRows(instance, report) },
-    { name: "サマリ", rows: summaryRows(report, params) },
+    { name: "サマリ", rows: summaryRows(report, params, seedSource) },
   ]);
 }
 
@@ -100,11 +101,12 @@ export function labRows(instance: Instance, report: Report): CsvValue[][] {
   return rows;
 }
 
-export function summaryRows(report: Report, params: Params): CsvValue[][] {
+export function summaryRows(report: Report, params: Params, seedSource: string): CsvValue[][] {
   const { summary } = report;
   const rows: CsvValue[][] = [
     ["項目", "値"],
     ["抽選シード", summary.seed],
+    ["シードの決め方", seedSource],
     ["GPA 配点", params.gpaWeight],
     ["GPA の満点", params.gpaMax],
     ["裁量点 配点", params.discretionaryWeight],
