@@ -236,18 +236,27 @@ export function looksLikeEclass(text: string): boolean {
   return /^"?\[[^\]\r\n]+\]/m.test(text);
 }
 
+export interface EclassAnswers {
+  /** 選択肢の番号 → 研究室。使われている選択肢だけが入る。 */
+  labels: Map<number, string>;
+  rows: PreferenceRow[];
+}
+
 /**
  * 入口。intake.ts からは、暫定 CSV の parsePreferences の代わりにこれを呼ぶ。
  *
- * 研究室は選択肢ラベルの文字列そのままで返す。研究室一覧の側でこの文字列に
- * 対応づける必要がある。
+ * 研究室は選択肢ラベルの文字列そのままで返す。選択肢の一覧も一緒に返すのは、
+ * 研究室一覧のファイルが無いときに、これが研究室の全体像になるから。希望順位に
+ * 現れた研究室を集めるのとは違い、誰も挙げなかった研究室も落とさない。
  */
-export function parseEclassPreferences(text: string): PreferenceRow[] {
+export function parseEclass(text: string): EclassAnswers {
   const sections = splitSections(text);
-  return parseUserAnswers(
-    findBlock(sections, BLOCKS.perUser),
-    parseOptionLabels(sections.parameters)
-  );
+  const labels = parseOptionLabels(sections.parameters);
+  return { labels, rows: parseUserAnswers(findBlock(sections, BLOCKS.perUser), labels) };
+}
+
+export function parseEclassPreferences(text: string): PreferenceRow[] {
+  return parseEclass(text).rows;
 }
 
 /** `<p>情報数理</p>` → `情報数理`。実体参照も戻す。 */
