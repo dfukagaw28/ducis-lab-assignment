@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildReport, findBlockingPairs } from "../src/domain/report.js";
+import { buildReport, findBlockingPairs, followUps } from "../src/domain/report.js";
 import { assign, type Assignment } from "../src/domain/solve.js";
 import { defaultParams, type Instance, type Params } from "../src/domain/types.js";
 import { sampleInstance } from "../src/dev/sampleInstance.js";
@@ -204,5 +204,67 @@ describe("合格ライン", () => {
     const looseX = looseReport.labs.find((lab) => lab.id === "X")!;
     expect(looseX.filled).toBe(2);
     expect(looseX.cutoff).toBeNull();
+  });
+});
+
+describe("followUps", () => {
+  /** 定員 1 の X に 3 人が殺到し、あぶれた分は Y が受け止める。 */
+  const instance: Instance = {
+    students: [
+      { id: "s1", gpa: 4, preferences: ["X", "Y"] },
+      { id: "s2", gpa: 3, preferences: ["X", "Y"] },
+      { id: "s3", gpa: 2, preferences: ["X"] },
+      { id: "s4", gpa: 1, preferences: [] },
+    ],
+    labs: [
+      { id: "X", capacity: 1, scores: new Map([["s1", 0], ["s2", 0], ["s3", 0], ["s4", 0]]) },
+      { id: "Y", capacity: 3, scores: new Map([["s1", 0], ["s2", 0], ["s3", 0], ["s4", 0]]) },
+    ],
+  };
+  const report = buildReport(instance, assign(instance, params));
+  const reasonOf = (id: string) =>
+    followUps(report).find((entry) => entry.student.id === id)?.reason;
+
+  it("希望を出さなかった学生を未提出として挙げる", () => {
+    expect(reasonOf("s4")).toBe("未提出");
+  });
+
+  it("挙げた研究室に入れなかった学生を希望外として挙げる", () => {
+    // s3 は X だけを希望したが、点で負けて Y に回った
+    expect(report.students.find((row) => row.id === "s3")!.listed).toBe(false);
+    expect(reasonOf("s3")).toBe("希望外");
+  });
+
+  it("希望どおりに入れた学生は挙げない", () => {
+    expect(reasonOf("s1")).toBeUndefined();
+    expect(reasonOf("s2")).toBeUndefined();
+  });
+
+  it("重い理由の順に並べる", () => {
+    const reasons = followUps(report).map((entry) => entry.reason);
+    expect(reasons).toEqual(["未提出", "希望外"]);
+  });
+
+  it("何番目の希望から拾うかを指定できる", () => {
+    // 第 2 希望から拾うと、Y に回った s2 も入る
+    const reasons = followUps(report, 2).map((entry) => entry.student.id);
+    expect(reasons).toContain("s2");
+  });
+
+  it("未配属の学生を最初に挙げる", () => {
+    const tight: Instance = {
+      students: instance.students,
+      labs: [{ id: "X", capacity: 1, scores: new Map([["s1", 0], ["s2", 0], ["s3", 0], ["s4", 0]]) }],
+    };
+    const cut: Instance = {
+      students: tight.students.map((student) => ({
+        ...student,
+        preferences: student.preferences.filter((lab) => lab === "X"),
+      })),
+      labs: tight.labs,
+    };
+    const found = followUps(buildReport(cut, assign(cut, params)));
+    expect(found[0]!.reason).toBe("未配属");
+    expect(found.filter((entry) => entry.reason === "未配属")).toHaveLength(3);
   });
 });

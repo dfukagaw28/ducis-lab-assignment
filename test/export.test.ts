@@ -48,7 +48,7 @@ describe("studentsCsv", () => {
   it("見出しと学生の数だけ行を書く", () => {
     expect(rows).toHaveLength(instance.students.length + 1);
     expect(rows[0]).toEqual([
-      "学籍番号", "氏名", "GPA", "抽選番号", "配属研究室", "研究室名", "希望順位", "希望外", "総合点", "研究室での順位",
+      "学籍番号", "氏名", "GPA", "抽選番号", "配属研究室", "研究室名", "希望順位", "希望外", "未提出", "総合点", "研究室での順位",
     ]);
   });
 
@@ -59,6 +59,7 @@ describe("studentsCsv", () => {
     expect(row[4]).toBe(student.lab ?? "");
     expect(row[6]).toBe(String(student.choice ?? ""));
     expect(row[7]).toBe(student.lab !== null && !student.listed ? "○" : "");
+    expect(row[8]).toBe(student.submitted ? "" : "○");
   });
 });
 

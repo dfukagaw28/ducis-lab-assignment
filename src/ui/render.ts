@@ -1,6 +1,6 @@
 /** 結果の描画。 */
 
-import type { Report } from "../domain/report.js";
+import { followUps, type Report } from "../domain/report.js";
 import type { Instance } from "../domain/types.js";
 import { escapeHtml } from "./dropzone.js";
 
@@ -116,6 +116,8 @@ export function renderReport(
     </tr></thead>
       <tbody>${labRows}</tbody></table>
 
+    ${followUpSection(report, labName)}
+
     <section class="panel" id="sensitivity">
       <h3>抽選シードによるぶれ</h3>
       <p class="hint">
@@ -149,4 +151,36 @@ export function renderMessages(root: HTMLElement, warnings: readonly string[]): 
 
 function percent(count: number, total: number): string {
   return total === 0 ? "-" : `${((count / total) * 100).toFixed(1)}%`;
+}
+
+/** 気に留めておきたい学生を一箇所に。 */
+function followUpSection(report: Report, labName: ReadonlyMap<string, string>): string {
+  const worseThan = 3;
+  const found = followUps(report, worseThan);
+  if (found.length === 0) {
+    return `<p class="ok">未配属・未提出・希望外・第${worseThan}希望以下の学生はいません。</p>`;
+  }
+
+  const rows = found
+    .map(
+      ({ student, reason }) => `<tr>
+        <td>${escapeHtml(reason)}</td>
+        <td><code>${escapeHtml(student.id)}</code></td>
+        <td>${escapeHtml(student.name ?? "")}</td>
+        <td>${student.lab === null ? "—" : escapeHtml(labName.get(student.lab) ?? student.lab)}</td>
+        <td class="num">${student.choice === null ? "—" : `第${student.choice}希望`}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `
+    <h3>要確認 <span class="hint">${found.length} 人</span></h3>
+    <p class="hint">
+      未配属、希望を出さなかった、挙げた研究室に入れなかった、第${worseThan}希望以下に
+      なった学生です。重い理由の順に並べています。
+    </p>
+    <table><thead><tr>
+      <th>理由</th><th>学籍番号</th><th>氏名</th><th>配属先</th><th class="num">希望順位</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+  `;
 }
