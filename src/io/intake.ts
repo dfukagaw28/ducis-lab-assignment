@@ -49,7 +49,7 @@ export interface Built {
 /** ファイル名から役割を当てる。外れても画面で直せる。 */
 export function guessRole(fileName: string): FileRole {
   const name = fileName.toLowerCase();
-  // eClass の書き出しはテキスト、他の 3 種類は表計算から出てくる
+  // e-class の書き出しはテキスト、他の 3 種類は表計算から出てくる
   if (/希望|preference|choice|answer|回答|アンケート|\.txt$/.test(name)) return "preferences";
   if (/gpa|成績/.test(name)) return "gpa";
   if (/定員|capacity|研究室一覧|labs?\b/.test(name)) return "labs";
@@ -261,7 +261,7 @@ function resolveCapacities(
 /**
  * 研究室一覧のファイルが無いときに、研究室を割り出す。
  *
- * eClass の書き出しなら選択肢がそのまま研究室の全体像なので、それを使う。誰も
+ * e-class の書き出しなら選択肢がそのまま研究室の全体像なので、それを使う。誰も
  * 挙げなかった研究室も選択肢には並んでいるので落とさない。暫定 CSV なら希望順位に
  * 現れた研究室を集めるしかない。
  *
@@ -367,7 +367,7 @@ function rowsOf(file: SourceFile): string[][] {
 /**
  * 研究室を、選択肢ラベル・研究室名・研究室 ID のどれからでも引けるようにする。
  *
- * eClass の希望順位ファイルは研究室を `○○研究室（○○　○○）` のような表示名で
+ * e-class の希望順位ファイルは研究室を `○○研究室（○○　○○）` のような表示名で
  * 指し、教員ごとの裁量点ファイルは教員氏名で指すのに対し、研究室一覧は `L01` の
  * ような ID で持っている。突き合わせるのが選択肢ラベルと教員氏名の列で、無ければ
  * 研究室名か ID がそのまま使われている場合に備える。

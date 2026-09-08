@@ -105,7 +105,7 @@ describe("splitSections", () => {
   });
 
   it("末尾の空行やカンマだけの行はブロックの行に数えない", () => {
-    // eClass は最後のブロックの後ろに空の行を並べることがある
+    // e-class は最後のブロックの後ろに空の行を並べることがある
     const padded = splitSections(`${fixture}\n,,\n,,\n\n\n`);
     const last = padded.blocks[padded.blocks.length - 1]!;
     expect(last.title).toBe(BLOCKS.counts);

@@ -1,5 +1,5 @@
 /**
- * eClass のファイルを覗く道具。
+ * e-class のファイルを覗く道具。
  *
  *   npm run inspect -- data/eclass.txt [--rows 5]
  *
