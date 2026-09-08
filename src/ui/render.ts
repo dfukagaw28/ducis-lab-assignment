@@ -107,6 +107,19 @@ export function renderReport(
     </tr></thead>
       <tbody>${labRows}</tbody></table>
 
+    <section class="panel" id="sensitivity">
+      <h3>抽選シードによるぶれ</h3>
+      <p class="hint">
+        抽選シードを何通りか振り直して解き直し、配属先がどれだけ変わるかを見ます。
+        結果を確定する前に、抽選がどれくらい効いているかを確かめるためのものです。
+      </p>
+      <div class="row">
+        <label>試行回数 <input id="runs" type="number" min="1" max="1000" value="100" /></label>
+        <button type="button" id="runSensitivity">試す</button>
+      </div>
+      <div id="sensitivityOut"></div>
+    </section>
+
     <h3>学生別</h3>
     <table><thead><tr>
       <th>学籍番号</th><th>氏名</th><th class="num">GPA</th><th class="num">抽選</th>

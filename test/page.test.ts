@@ -52,6 +52,20 @@ describe("page", () => {
     expect(app.querySelector<HTMLElement>("#output")!.textContent).toContain(seed.value);
   });
 
+  it("シードのぶれを試すと、その場に結果が出る", async () => {
+    const runs = app.querySelector<HTMLInputElement>("#runs")!;
+    runs.value = "20";
+    app.querySelector<HTMLButtonElement>("#runSensitivity")!.click();
+
+    const box = app.querySelector<HTMLElement>("#sensitivityOut")!;
+    expect(box.textContent).toContain("計算中");
+
+    // 描いてから計算するので、一度譲る
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(box.textContent).toContain("配属先が動かなかった");
+    expect(box.textContent).toContain("20 通り");
+  });
+
   it("ファイルを入れると、前の入力で出した結果を消す", async () => {
     const output = app.querySelector<HTMLElement>("#output")!;
     expect(output.textContent).toContain("サンプルデータ");

@@ -7,7 +7,8 @@
  */
 
 import { buildReport, type Report } from "./domain/report.js";
-import { assign } from "./domain/solve.js";
+import { measureSensitivity } from "./domain/sensitivity.js";
+import { assign, type Assignment } from "./domain/solve.js";
 import {
   defaultParams,
   randomSeed,
@@ -28,6 +29,7 @@ import {
 import { buildInstance } from "./io/intake.js";
 import { createDropZone, message } from "./ui/dropzone.js";
 import { renderMessages, renderReport } from "./ui/render.js";
+import { renderSensitivity } from "./ui/sensitivity.js";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) throw new Error("#app is missing from index.html");
@@ -90,7 +92,12 @@ field("discMax").value = String(defaultParams.discretionaryMax);
 const dropZone = createDropZone(app.querySelector<HTMLElement>("#intake")!);
 
 /** 直近の結果。ダウンロードのために持っておく。 */
-let latest: { instance: Instance; report: Report; params: Params } | null = null;
+let latest: {
+  instance: Instance;
+  report: Report;
+  params: Params;
+  assignment: Assignment;
+} | null = null;
 /** サンプルを使っているときだけ入る。ファイルを入れれば消える。 */
 let sample: Instance | null = null;
 
@@ -124,6 +131,11 @@ app.querySelector<HTMLFormElement>("#controls")!.addEventListener("submit", (eve
 });
 
 output.addEventListener("click", (event) => {
+  if ((event.target as HTMLElement).closest("#runSensitivity") !== null) {
+    runSensitivity();
+    return;
+  }
+
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-download]");
   if (button === null || latest === null) return;
   const { instance, report, params } = latest;
@@ -159,6 +171,27 @@ function readParams(): Params {
   };
 }
 
+function runSensitivity(): void {
+  if (latest === null) return;
+  const box = output.querySelector<HTMLElement>("#sensitivityOut");
+  const field = output.querySelector<HTMLInputElement>("#runs");
+  if (box === null || field === null) return;
+
+  const { instance, params, assignment } = latest;
+  box.innerHTML = `<p class="hint">計算中…</p>`;
+  // 一度描いてから計算する（学生数が多いと数秒かかることがある）
+  window.setTimeout(() => {
+    try {
+      const result = measureSensitivity(instance, params, assignment, Number(field.value));
+      renderSensitivity(box, instance, result);
+    } catch (cause) {
+      box.innerHTML = "";
+      errorBox.textContent = message(cause);
+      errorBox.hidden = false;
+    }
+  }, 0);
+}
+
 /** 何から出した結果なのかを、結果と一緒に出すための一行。 */
 function source(files: readonly { name: string }[]): string {
   return sample === null
@@ -177,9 +210,10 @@ function run(): void {
     const params = readParams();
     const built =
       sample === null ? buildInstance(files, params.seed) : { instance: sample, warnings: [] };
-    const report = buildReport(built.instance, assign(built.instance, params));
+    const assignment = assign(built.instance, params);
+    const report = buildReport(built.instance, assignment);
 
-    latest = { instance: built.instance, report, params };
+    latest = { instance: built.instance, report, params, assignment };
     renderMessages(warningBox, built.warnings);
     renderReport(output, built.instance, report, source(files));
   } catch (cause) {
