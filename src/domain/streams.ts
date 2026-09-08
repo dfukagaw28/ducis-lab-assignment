@@ -13,6 +13,8 @@ export const STREAM = {
   preferenceRest: 1,
   /** 定員の余り一席をどの研究室に渡すか */
   capacity: 2,
+  /** シードを振り直して結果のぶれを見るとき、その振り直しに使う */
+  sensitivity: 3,
 } as const;
 
 export type Stream = (typeof STREAM)[keyof typeof STREAM];

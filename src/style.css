@@ -177,3 +177,11 @@ button.primary {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+.warn-note {
+  color: color-mix(in srgb, orange 70%, currentColor);
+}
+
+#sensitivity {
+  margin-top: 1.5rem;
+}
