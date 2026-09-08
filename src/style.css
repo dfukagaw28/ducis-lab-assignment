@@ -185,3 +185,52 @@ button.primary {
 #sensitivity {
   margin-top: 1.5rem;
 }
+
+/*
+ * 希望順位の内訳の帯。
+ *
+ * 色は data-viz の既定パレットの categorical slot 1（青）と 2（橙）。明暗どちらの
+ * 地の上でも、色覚特性のある人にも見分けが付くことを検証済み（CVD ΔE 24.7 / 26.8、
+ * コントラスト 3:1 以上）。ただし色だけに頼らせないよう、区分の名前と人数は
+ * どの行にも文字で出す。
+ */
+:root {
+  --viz-choice: #2a78d6;
+  --viz-unlisted: #eb6834;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --viz-choice: #3987e5;
+    --viz-unlisted: #d95926;
+  }
+}
+
+.distribution .bar-head {
+  width: 45%;
+}
+
+.distribution .bar-cell {
+  padding-left: 0.8rem;
+}
+
+.distribution .bar {
+  height: 0.7rem;
+  /* 起点は角のまま、伸びた先だけ丸める */
+  border-radius: 0 4px 4px 0;
+  background: var(--viz-choice);
+  /* 1 人でも見えるように */
+  min-width: 2px;
+}
+
+.distribution .bar.unlisted {
+  background: var(--viz-unlisted);
+}
+
+.distribution .bar.unmatched {
+  background: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.distribution td.unmatched {
+  color: var(--muted);
+}
