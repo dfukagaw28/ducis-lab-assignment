@@ -15,6 +15,8 @@ export interface StudentRow {
   choice: number | null;
   /** 配属先が学生自身の希望順位表にあったか */
   listed: boolean;
+  /** 希望順位を一つでも出したか。出していない学生は全研究室で後回しになる。 */
+  submitted: boolean;
   /** 配属先での総合点。未配属なら null */
   total: number | null;
   /**
@@ -91,6 +93,7 @@ export function buildReport(instance: Instance, assignment: Assignment): Report 
       lab,
       choice: choice < 0 ? null : choice + 1,
       listed: choice >= 0,
+      submitted: student.preferences.length > 0,
       total: scored?.total ?? null,
       rankInLab: lab === null ? null : positions.get(lab)!.get(student.id)! + 1,
     };
@@ -225,5 +228,49 @@ export function rankPositions(assignment: Assignment): Map<LabId, Map<StudentId,
       labId,
       new Map(scored.map((entry, position) => [entry.id, position])),
     ])
+  );
+}
+
+/** 気に留めておきたい学生の理由。上にあるものほど重い。 */
+export const FOLLOW_UP_REASONS = ["未配属", "未提出", "希望外", "下位希望"] as const;
+export type FollowUpReason = (typeof FOLLOW_UP_REASONS)[number];
+
+export interface FollowUp {
+  student: StudentRow;
+  reason: FollowUpReason;
+}
+
+/**
+ * 目を通しておきたい学生を集める。
+ *
+ * 全体の表から目で拾うのではなく、一箇所にまとめる。理由の重い順、同じ理由なら
+ * 学生 ID 順。
+ *
+ * - **未配属**: どこにも入っていない。定員が足りていない
+ * - **未提出**: 希望を出さなかったので、余った枠に入った
+ * - **希望外**: 希望は出したが、挙げた研究室に入れなかった
+ * - **下位希望**: 第 `worseThan` 希望より下に落ちた
+ */
+export function followUps(report: Report, worseThan = 3): FollowUp[] {
+  const found: FollowUp[] = [];
+
+  for (const student of report.students) {
+    const reason: FollowUpReason | null =
+      student.lab === null
+        ? "未配属"
+        : !student.submitted
+          ? "未提出"
+          : !student.listed
+            ? "希望外"
+            : student.choice !== null && student.choice >= worseThan
+              ? "下位希望"
+              : null;
+    if (reason !== null) found.push({ student, reason });
+  }
+
+  return found.sort(
+    (a, b) =>
+      FOLLOW_UP_REASONS.indexOf(a.reason) - FOLLOW_UP_REASONS.indexOf(b.reason) ||
+      compareIds(a.student.id, b.student.id)
   );
 }

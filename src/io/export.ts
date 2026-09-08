@@ -44,7 +44,7 @@ export function studentRows(instance: Instance, report: Report): CsvValue[][] {
   const rows: CsvValue[][] = [
     // 「研究室での順位」は、その研究室が全学生に付けた順位。研究室別シートの
     // 「配属順位」（配属された学生の中での順)とは別物なので、名前を分けてある。
-    ["学籍番号", "氏名", "GPA", "抽選番号", "配属研究室", "研究室名", "希望順位", "希望外", "総合点", "研究室での順位"],
+    ["学籍番号", "氏名", "GPA", "抽選番号", "配属研究室", "研究室名", "希望順位", "希望外", "未提出", "総合点", "研究室での順位"],
   ];
   for (const row of report.students) {
     rows.push([
@@ -56,6 +56,7 @@ export function studentRows(instance: Instance, report: Report): CsvValue[][] {
       row.lab === null ? "" : labName.get(row.lab)!,
       row.choice ?? "",
       row.lab !== null && !row.listed ? "○" : "",
+      row.submitted ? "" : "○",
       row.total === null ? "" : round(row.total),
       row.rankInLab ?? "",
     ]);
