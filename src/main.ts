@@ -9,13 +9,7 @@
 import { buildReport, type Report } from "./domain/report.js";
 import { measureSensitivity } from "./domain/sensitivity.js";
 import { assign, type Assignment } from "./domain/solve.js";
-import {
-  defaultParams,
-  randomSeed,
-  type Instance,
-  type MissingScorePolicy,
-  type Params,
-} from "./domain/types.js";
+import { defaultParams, randomSeed, type Instance, type Params } from "./domain/types.js";
 import { sampleInstance } from "./dev/sampleInstance.js";
 import {
   downloadCsv,
@@ -60,14 +54,6 @@ app.innerHTML = `
       <label>裁量点 配点 <input id="discWeight" type="number" min="0" max="100" step="1" /></label>
       <label>裁量点の満点 <input id="discMax" type="number" min="0.1" step="0.1" /></label>
     </div>
-    <div class="row">
-      <label>裁量点が無い学生
-        <select id="missingScore">
-          <option value="zero">0 点として扱う</option>
-          <option value="unacceptable">受け入れ不可にする</option>
-        </select>
-      </label>
-    </div>
     <button type="submit" class="primary">配属を計算する</button>
     <p id="error" class="error" hidden></p>
   </form>
@@ -77,7 +63,6 @@ app.innerHTML = `
 `;
 
 const field = (id: string) => app.querySelector<HTMLInputElement>(`#${id}`)!;
-const missingScoreField = app.querySelector<HTMLSelectElement>("#missingScore")!;
 const errorBox = app.querySelector<HTMLElement>("#error")!;
 const warningBox = app.querySelector<HTMLElement>("#warnings")!;
 const output = app.querySelector<HTMLElement>("#output")!;
@@ -167,7 +152,6 @@ function readParams(): Params {
     gpaMax: Number(field("gpaMax").value),
     discretionaryWeight: Number(field("discWeight").value),
     discretionaryMax: Number(field("discMax").value),
-    missingScore: missingScoreField.value as MissingScorePolicy,
   };
 }
 

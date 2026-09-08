@@ -34,9 +34,6 @@ export function gpaPoint(student: Student, params: Params): number {
  * どの研究室も提出者を未提出者より上に見るので、提出しなかった学生が提出した学生を
  * 押しのけることはない。安定マッチングの性質から、これは「提出者が収まった後の空きに
  * 未提出者が入る」ことを意味する（そうでなければブロッキングペアができる）。
- *
- * 裁量点が無い学生は、missingScore が "unacceptable" なら並びから外れる
- * （その研究室に配属されない）。
  */
 export function rankStudents(
   lab: Lab,
@@ -50,8 +47,8 @@ export function rankStudents(
 
   const scored: ScoredStudent[] = [];
   for (const student of students) {
+    // 裁量点が無い学生は 0 点。名簿と揃っているかは intake.ts が確かめる
     const raw = lab.scores.get(student.id);
-    if (raw === undefined && params.missingScore === "unacceptable") continue;
 
     const number = lottery.get(student.id);
     if (number === undefined) {

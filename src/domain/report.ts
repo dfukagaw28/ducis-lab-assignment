@@ -198,7 +198,7 @@ export function findBlockingPairs(
     for (let i = 0; i < currentChoice; i++) {
       const labId = preferences[i]!;
       const rank = positions.get(labId)?.get(student.id);
-      if (rank === undefined) continue; // その研究室にとって受け入れ不可
+      if (rank === undefined) continue; // その研究室の並びに載っていない（いまは起きない）
 
       const assigned = assignment.labToStudents.get(labId) ?? [];
       if (assigned.length < capacities.get(labId)!) {
@@ -221,7 +221,7 @@ function compareIds(a: StudentId, b: StudentId): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-/** 研究室ごとの、学生の選好順位（0 始まり）。受け入れ不可の学生は載らない。 */
+/** 研究室ごとの、学生の選好順位（0 始まり）。 */
 export function rankPositions(assignment: Assignment): Map<LabId, Map<StudentId, number>> {
   return new Map(
     [...assignment.rankings].map(([labId, scored]) => [

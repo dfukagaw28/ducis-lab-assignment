@@ -103,11 +103,14 @@ scripts/
 **`HospitalResident.solve()` は使いません。**使うのは `stableMatch()` と、乱数・
 人気度の道具（`Pcg32Rng` / `permutation` / `popularityKeys` / `compareKeys`）だけです。
 `HospitalResident` は合成データ作りにのみ登場します。理由は
-[`preferences.ts`](src/domain/preferences.ts) の冒頭に書いてありますが、要点は
-`solve()` が研究室側の選好リストの完全性を前提にしていることです。載っていない学生の
-順位が `-1` で、それが最上位として扱われるため、「受け入れ不可」にした学生が逆に
-最優先になります。`stableMatch()` は相互に載っていることを求めるので、この問題は
-ありません。
+[`preferences.ts`](src/domain/preferences.ts) の冒頭に書いてあります（要は添字ベース
+であることと、シャッフルが入力の行順に依ること）。
+
+もう一点、`HospitalResident.solve()` は**研究室側の選好リストが完全であることを前提に
+しています**。載っていない学生の順位が `-1` で、それが最上位として扱われるためです。
+いまは全学生がどの研究室の並びにも載るので実害はありませんが、乗り換えを考えるなら
+先に知っておくべき穴です。`stableMatch()` は相互に載っていることを求めるので、この
+問題はありません。
 
 ## テスト
 
