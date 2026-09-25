@@ -630,17 +630,18 @@ describe("見出しの全角・半角", () => {
       expect(instance.labs.find((lab) => lab.id === "L01")!.scores.size).toBe(10);
     });
 
-    it("教員氏名が 2 種類あれば知らせる", () => {
+    it("教員氏名が 2 種類あれば止まる", () => {
       const mixed = only((row, i) => (i === 3 ? [row[0]!, row[1]!, "△△　△△", row[3]!] : row));
-      const { warnings } = buildInstance(mixed, SEED);
-      expect(warnings.join()).toMatch(/教員氏名が 2 種類あります（○○　○○、△△　△△）/);
+      expect(() => buildInstance(mixed, SEED)).toThrow(
+        /教員氏名が 2 種類あります（○○　○○、△△　△△）/
+      );
     });
 
-    it("2 種類あって空の行もあれば、どちらで埋めるか決められないので止まる", () => {
+    it("空の行が混じっていても、2 種類あれば止まる", () => {
       const mixed = only((row, i) =>
         i === 3 ? [row[0]!, row[1]!, "△△　△△", row[3]!] : i <= 1 ? row : blankTeacher(row)
       );
-      expect(() => buildInstance(mixed, SEED)).toThrow(/どちらのものか決められません/);
+      expect(() => buildInstance(mixed, SEED)).toThrow(/教員氏名が 2 種類あります/);
     });
 
     it("1 つも書かれていなければ止まる", () => {
@@ -648,7 +649,7 @@ describe("見出しの全角・半角", () => {
       expect(() => buildInstance(none, SEED)).toThrow(/教員氏名がどの行にも書かれていません/);
     });
 
-    it("研究室の列でまとめた CSV は、複数の研究室が並んでも知らせない", () => {
+    it("研究室の列でまとめた CSV は、複数の研究室が並んでも止めない", () => {
       const combined: SourceFile = {
         name: "scores.csv",
         role: "scores",
@@ -672,7 +673,8 @@ describe("見出しの全角・半角", () => {
         ].join("\n"),
       };
       const files = [...eclassFiles.filter((file) => file.role !== "scores"), combined, labs];
-      const { warnings } = buildInstance(files, SEED);
+      const { instance, warnings } = buildInstance(files, SEED);
+      expect(instance.labs).toHaveLength(4);
       expect(warnings.filter((w) => /種類あります/.test(w))).toEqual([]);
     });
   });

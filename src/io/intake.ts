@@ -125,7 +125,7 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
   const scoreSources = new Map<string, Set<string>>();
   for (const file of scoreFiles) {
     const sheet = inFile(file, () => parseScoreRows(rowsOf(file)));
-    const only = soleLab(file, sheet, warnings);
+    const only = soleLab(file, sheet);
     const blanks: StudentId[] = [];
 
     for (const row of sheet.rows) {
@@ -133,10 +133,7 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
       // 教員氏名が書かれていない行は、そのファイルの教員のものとして埋める
       const where = row.lab === "" ? only : row.lab;
       if (where === undefined) {
-        throw new Error(
-          `${file.name}: ${row.student} の行に教員氏名がありません。` +
-            `ファイルの中に教員氏名が複数あるので、どちらのものか決められません`
-        );
+        throw new Error(`${file.name}: ${row.student} の行に研究室が書かれていません`);
       }
       // 研究室 ID でも、研究室名でも、教員氏名でも引ける
       const forLab = scores.get(byAnyName.get(matchKey(where)) ?? "");
@@ -311,16 +308,13 @@ function resolveCapacities(
  *
  * 教員ごとの Excel は一人の教員のものなので、教員氏名はどの行も同じはず。書かれて
  * いる名前が一つなら、空の行はそれで埋める（全行に書いてもらう必要はない）。
- * 二つ以上あれば前提が崩れているので知らせる。一つも無ければ、どの研究室の点数か
- * 決めようがないので止める。
+ * 二つ以上あれば前提が崩れている — 二人ぶんが一つのファイルに混ざっているか、
+ * 誰かの名前が書き換わっている — ので止める。一つも無ければ、どの研究室の点数か
+ * 決めようがないので、これも止める。
  *
  * 研究室の列でまとめた CSV は複数の研究室が並ぶのが普通なので、そちらは数えない。
  */
-function soleLab(
-  file: SourceFile,
-  sheet: ScoreSheet,
-  warnings: string[]
-): string | undefined {
+function soleLab(file: SourceFile, sheet: ScoreSheet): string | undefined {
   const named = [...new Set(sheet.rows.map((row) => row.lab).filter((lab) => lab !== ""))];
   const what = sheet.byTeacher ? "教員氏名" : "研究室";
 
@@ -329,12 +323,13 @@ function soleLab(
   }
   if (named.length > 1) {
     if (sheet.byTeacher) {
-      warnings.push(
+      throw new Error(
         `${file.name}: 教員氏名が ${named.length} 種類あります（${named.join("、")}）。` +
-          `1 つのファイルは 1 人の教員のもののはずです`
+          `1 つのファイルは 1 人の教員のものです`
       );
     }
-    // どれで埋めればよいか決められないので、空の行は後で個別に断る
+    // 研究室の列なら複数あって当たり前。空の行はどれで埋めるか決められないので、
+    // 後で個別に断る
     return undefined;
   }
   return named[0];
