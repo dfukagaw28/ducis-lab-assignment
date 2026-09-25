@@ -5,6 +5,7 @@
  */
 
 import type { Report } from "../domain/report.js";
+import type { Assignment } from "../domain/solve.js";
 import type { Instance, Params } from "../domain/types.js";
 import { toCsv, type CsvValue } from "./csv.js";
 
@@ -38,6 +39,47 @@ export async function resultWorkbook(
     { name: "研究室別", rows: labRows(instance, report) },
     { name: "サマリ", rows: summaryRows(report, params, seedSource) },
   ]);
+}
+
+export function rankingCsv(instance: Instance, assignment: Assignment): string {
+  return toCsv(rankingRows(instance, assignment));
+}
+
+/**
+ * 研究室ごとの、全学生の順位と点の内訳。
+ *
+ * 結果そのものではなく、結果を確かめるためのもの。研究室が実際に使った並びを、
+ * 点の内訳（GPA 点と裁量点）と一緒にそのまま出す。`配属` の ○ が途切れるところが
+ * 合格ラインで、その上下で何がどう効いたのかを見られる。
+ */
+export function rankingRows(instance: Instance, assignment: Assignment): CsvValue[][] {
+  const studentName = new Map(instance.students.map((student) => [student.id, student.name ?? ""]));
+  const rows: CsvValue[][] = [
+    ["研究室", "研究室名", "順位", "学籍番号", "氏名", "提出", "GPA点", "裁量点", "総合点", "抽選番号", "配属"],
+  ];
+
+  for (const lab of instance.labs) {
+    const placed = new Set(assignment.labToStudents.get(lab.id) ?? []);
+    const ranked = assignment.rankings.get(lab.id) ?? [];
+
+    ranked.forEach((entry, index) => {
+      rows.push([
+        lab.id,
+        lab.name ?? "",
+        index + 1,
+        entry.id,
+        studentName.get(entry.id) ?? "",
+        entry.submitted ? "" : "未提出",
+        round(entry.gpaPoint),
+        round(entry.discretionaryPoint),
+        round(entry.total),
+        entry.lottery,
+        placed.has(entry.id) ? "○" : "",
+      ]);
+    });
+  }
+
+  return rows;
 }
 
 export function studentRows(instance: Instance, report: Report): CsvValue[][] {

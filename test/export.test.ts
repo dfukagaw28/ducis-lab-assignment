@@ -10,6 +10,7 @@ import { parseCsv } from "../src/io/csv.js";
 import {
   labsCsv,
   outputFileName,
+  rankingCsv,
   resultWorkbook,
   studentsCsv,
   summaryCsv,
@@ -41,7 +42,8 @@ const SEED = 20260906;
 const SEED_SOURCE = "手で指定";
 const params: Params = { ...defaultParams, seed: SEED };
 const { instance } = buildInstance(files, SEED);
-const report = buildReport(instance, assign(instance, params));
+const assignment = assign(instance, params);
+const report = buildReport(instance, assignment);
 
 describe("studentsCsv", () => {
   const rows = parseCsv(studentsCsv(instance, report));
@@ -102,6 +104,60 @@ describe("summaryCsv", () => {
   it("希望順位の内訳を書く", () => {
     const counts = report.summary.choiceCounts;
     expect(text).toContain(`第1希望,${counts[0]}`);
+  });
+});
+
+describe("rankingCsv", () => {
+  const rows = parseCsv(rankingCsv(instance, assignment));
+  const header = rows[0]!;
+  const body = rows.slice(1);
+  const at = (name: string) => header.indexOf(name);
+
+  it("研究室ごとに、全学生を 1 行ずつ並べる", () => {
+    expect(header).toEqual([
+      "研究室", "研究室名", "順位", "学籍番号", "氏名", "提出",
+      "GPA点", "裁量点", "総合点", "抽選番号", "配属",
+    ]);
+    expect(body).toHaveLength(instance.labs.length * instance.students.length);
+  });
+
+  it("順位は研究室ごとに 1 から振る", () => {
+    for (const lab of instance.labs) {
+      const ranks = body.filter((row) => row[0] === lab.id).map((row) => Number(row[at("順位")]));
+      expect(ranks).toEqual(instance.students.map((_, i) => i + 1));
+    }
+  });
+
+  it("提出した学生が先に並び、その中では総合点の高い順", () => {
+    for (const lab of instance.labs) {
+      const inLab = body.filter((row) => row[0] === lab.id);
+      const submitted = inLab.map((row) => row[at("提出")] !== "未提出");
+      // 提出した学生の塊のあとに未提出の塊が来る
+      expect(submitted).toEqual([...submitted].sort((a, b) => Number(b) - Number(a)));
+
+      for (const group of [true, false]) {
+        const totals = inLab
+          .filter((row) => (row[at("提出")] !== "未提出") === group)
+          .map((row) => Number(row[at("総合点")]));
+        expect(totals).toEqual([...totals].sort((a, b) => b - a));
+      }
+    }
+  });
+
+  it("点の内訳を足すと総合点になる", () => {
+    for (const row of body) {
+      const parts = Number(row[at("GPA点")]) + Number(row[at("裁量点")]);
+      expect(Math.abs(parts - Number(row[at("総合点")]))).toBeLessThan(0.02);
+    }
+  });
+
+  it("配属された学生に ○ が付く", () => {
+    for (const lab of report.labs) {
+      const marked = body
+        .filter((row) => row[0] === lab.id && row[at("配属")] === "○")
+        .map((row) => row[at("学籍番号")]);
+      expect(marked.sort()).toEqual([...lab.students].sort());
+    }
   });
 });
 

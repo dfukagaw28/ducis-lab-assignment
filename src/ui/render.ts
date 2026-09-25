@@ -88,7 +88,12 @@ export function renderReport(
       <button type="button" data-download="students">学生別 CSV</button>
       <button type="button" data-download="labs">研究室別 CSV</button>
       <button type="button" data-download="summary">サマリ CSV</button>
+      <button type="button" data-download="ranking">順位の内訳 CSV</button>
     </div>
+    <p class="hint">
+      「順位の内訳」は、研究室ごとに全学生の順位と点の内訳（GPA 点・裁量点）を並べた
+      ものです。結果を確かめるためのもので、配属の一覧ではありません。
+    </p>
 
     <h3>希望順位の内訳</h3>
     <table class="distribution">
