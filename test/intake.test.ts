@@ -607,6 +607,61 @@ describe("見出しの全角・半角", () => {
     expect(() => buildInstance(unknown, SEED)).not.toThrow(/研究室一覧に見つかりません/);
   });
 
+  describe("配属の対象から外す", () => {
+    /** GPA の表に `除外` の列を足す */
+    const withExclusions = (marks: Record<string, string>) =>
+      eclassFiles.map((file) =>
+        file.role === "gpa" && file.rows !== undefined
+          ? {
+              ...file,
+              rows: file.rows.map((row, i) =>
+                i === 0 ? [...row, "除外"] : [...row, marks[row[0]!] ?? ""]
+              ),
+            }
+          : file
+      );
+
+    it("印を付けた学生を名簿から外す", () => {
+      // 1234560002 は希望を出している。GPA から行を消すだけでは外れない
+      const { instance, warnings } = buildInstance(withExclusions({ "1234560002": "○" }), SEED);
+      expect(instance.students.some((student) => student.id === "1234560002")).toBe(false);
+      expect(instance.students).toHaveLength(9);
+      expect(warnings.join()).toMatch(/1 人を配属の対象から外しました（1234560002）/);
+    });
+
+    it("希望を出していない学生も外せる", () => {
+      const { instance } = buildInstance(withExclusions({ "1234560007": "○" }), SEED);
+      expect(instance.students.some((student) => student.id === "1234560007")).toBe(false);
+    });
+
+    it("定員は外した後の人数で決まる", () => {
+      const { instance } = buildInstance(
+        withExclusions({ "1234560002": "○", "1234560007": "○" }),
+        SEED
+      );
+      expect(instance.labs.reduce((sum, lab) => sum + lab.capacity, 0)).toBe(8);
+    });
+
+    it("外した学生の点数が裁量点の表に残っていても、余計なことを言わない", () => {
+      const { warnings } = buildInstance(withExclusions({ "1234560002": "○" }), SEED);
+      expect(warnings.filter((w) => /名簿に無い/.test(w))).toEqual([]);
+    });
+
+    it("読めない印は、勝手に解釈せず止まる", () => {
+      // 「否」のように逆の意味で書かれた値を除外と読むと、学生が黙って落ちる
+      expect(() => buildInstance(withExclusions({ "1234560002": "たぶん" }), SEED)).toThrow(
+        /除外の欄に「たぶん」と書かれていますが、読めません/
+      );
+    });
+
+    it("全員を外したら止まる", () => {
+      const all = Object.fromEntries(
+        Array.from({ length: 10 }, (_, i) => [`123456${String(i + 1).padStart(4, "0")}`, "○"])
+      );
+      expect(() => buildInstance(withExclusions(all), SEED)).toThrow(/一人もいません/);
+    });
+  });
+
   describe("1 つのファイルは 1 人の教員のもの", () => {
     /** ○○先生のファイルだけに手を入れる */
     const only = (f: (row: string[], index: number) => string[]) =>

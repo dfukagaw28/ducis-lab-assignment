@@ -91,7 +91,10 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
 
   const gpaFile = only("gpa");
   const gpaRows = inFile(gpaFile, () => parseGpaRows(rowsOf(gpaFile)));
-  const gpa = new Map(gpaRows.map((row) => [row.id, row.gpa]));
+  // 配属の対象から外す学生。名簿から消すのではなく印を付けるので、誰を外したかが
+  // ファイルに残る
+  const excluded = new Set(gpaRows.filter((row) => row.excluded === true).map((row) => row.id));
+  const gpa = new Map(gpaRows.filter((row) => !excluded.has(row.id)).map((row) => [row.id, row.gpa]));
   // 名簿の氏名。希望順位を出していない学生の氏名はここか裁量点の表から取る。
   const namesFromGpa = new Map<StudentId, string>(
     gpaRows.filter((row) => row.name !== undefined).map((row) => [row.id, row.name!])
@@ -164,7 +167,9 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
   }
 
   const seen = new Set<StudentId>();
-  const students: Student[] = preferenceRows.map((row) => {
+  const students: Student[] = preferenceRows
+    .filter((row) => !excluded.has(row.id))
+    .map((row) => {
     if (seen.has(row.id)) throw new Error(`学籍番号 ${row.id} が重複しています`);
     seen.add(row.id);
 
@@ -229,7 +234,14 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
     );
   }
 
-  checkRoster(students, scores, scoreSources, warnings);
+  if (excluded.size > 0) {
+    warnings.push(
+      `${excluded.size} 人を配属の対象から外しました（${list([...excluded].sort())}）`
+    );
+  }
+  if (students.length === 0) throw new Error("配属の対象になる学生が一人もいません");
+
+  checkRoster(students, scores, excluded, scoreSources, warnings);
 
   // 定員はシードから決まることがあるので、シードは定員を決める前の入力から導く
   const drawSeed =
@@ -400,6 +412,7 @@ const TEACHER_COLUMN = "教員氏名";
 function checkRoster(
   students: readonly Student[],
   scores: ReadonlyMap<string, Map<StudentId, number>>,
+  excluded: ReadonlySet<StudentId>,
   sources: ReadonlyMap<string, Set<string>>,
   warnings: string[]
 ): void {
@@ -420,7 +433,10 @@ function checkRoster(
       );
     }
 
-    const extra = [...forLab.keys()].filter((id) => !roster.has(id)).sort();
+    // 対象から外した学生の点数が残っているのは当たり前なので数えない
+    const extra = [...forLab.keys()]
+      .filter((id) => !roster.has(id) && !excluded.has(id))
+      .sort();
     if (extra.length > 0) {
       warnings.push(
         `${from}: 名簿に無い ${extra.length} 人の点数があります（${list(extra)}）。無視します`

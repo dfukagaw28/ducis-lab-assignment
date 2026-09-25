@@ -19,6 +19,16 @@ const OPTION_LABEL = ["選択肢ラベル", "eclass", "eclassラベル", "ラベ
 const GPA = ["gpa", "GPA", "成績", "評点"];
 const SCORE = ["裁量点", "教員裁量点", "点数", "得点", "評価点", "score"];
 const TEACHER = ["教員氏名", "教員名", "担当教員", "教員", "先生"];
+const EXCLUDE = ["除外", "配属対象外", "対象外"];
+
+/**
+ * 除外の印として受ける値。
+ *
+ * 空欄は「配属する」。印が付いていれば「配属しない」。読めない値は勝手に解釈せず
+ * 止める（`否` や `対象` のような、逆の意味で書かれた値を除外と読むと、学生が黙って
+ * 名簿から落ちる）。
+ */
+const EXCLUDE_MARKS = ["○", "◯", "〇", "●", "✓", "✔", "v", "1", "y", "yes", "true", "除外", "対象外"];
 
 
 export interface PreferenceRow {
@@ -32,6 +42,8 @@ export interface GpaRow {
   /** 学生氏名の列があれば。希望順位を出していない学生の氏名はここから取れる。 */
   name?: string;
   gpa: number;
+  /** 配属の対象から外す（`除外` の列に印が付いている）。 */
+  excluded?: boolean;
 }
 
 export interface LabRow {
@@ -127,6 +139,8 @@ export function parseGpaRows(rows: readonly string[][]): GpaRow[] {
     if (seen.has(id)) throw new Error(`学籍番号 ${id} が重複しています`);
     seen.add(id);
 
+    const excluded = isExcluded(pick(row, EXCLUDE), id);
+
     const score = pick(row, GPA);
     if (score === undefined) throw missingColumn("GPA", GPA);
 
@@ -135,6 +149,7 @@ export function parseGpaRows(rows: readonly string[][]): GpaRow[] {
       id,
       ...(name === undefined || name === "" ? {} : { name }),
       gpa: toNumber(score, `${id} の GPA`),
+      ...(excluded ? { excluded } : {}),
     });
   }
 
@@ -286,6 +301,17 @@ function pick(row: Record<string, string>, aliases: readonly string[]): string |
     if (startsWithAlias(key, wanted)) return value;
   }
   return undefined;
+}
+
+/** 除外の欄を読む。読めない値は止める（下の EXCLUDE_MARKS を参照）。 */
+function isExcluded(value: string | undefined, id: string): boolean {
+  const mark = (value ?? "").normalize("NFKC").trim();
+  if (mark === "") return false;
+  if (EXCLUDE_MARKS.some((accepted) => matchable(accepted) === matchable(mark))) return true;
+  throw new Error(
+    `${id} の除外の欄に「${mark}」と書かれていますが、読めません。` +
+      `配属対象から外すなら ○ を、外さないなら空欄にしてください`
+  );
 }
 
 /** 見当たらなかった列を、その見出しの候補ごと知らせる。 */
