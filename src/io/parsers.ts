@@ -89,7 +89,7 @@ export function parsePreferenceRows(rows: readonly string[][]): PreferenceRow[] 
     .map((row) => {
       const name = nameIndex < 0 ? undefined : (row[nameIndex] ?? "").trim();
       return {
-        id: (row[idIndex] ?? "").trim(),
+        id: normalizeId(row[idIndex] ?? ""),
         ...(name === undefined || name === "" ? {} : { name }),
         preferences: choiceIndexes
           .map((index) => (row[index] ?? "").trim())
@@ -108,8 +108,9 @@ export function parseGpaRows(rows: readonly string[][]): GpaRow[] {
   const gpa: GpaRow[] = [];
   const body = withHeader(rows);
   for (const row of body) {
-    const id = pick(row, STUDENT_ID);
-    if (id === undefined || id === "") continue;
+    const raw = pick(row, STUDENT_ID);
+    if (raw === undefined || raw === "") continue;
+    const id = normalizeId(raw);
     if (seen.has(id)) throw new Error(`学籍番号 ${id} が重複しています`);
     seen.add(id);
 
@@ -146,7 +147,7 @@ export function parseLabRows(rows: readonly string[][]): LabRow[] {
   return withHeader(rows)
     .filter((row) => (pick(row, LAB_ID) ?? "") !== "")
     .map((row) => {
-      const id = pick(row, LAB_ID)!;
+      const id = normalizeId(pick(row, LAB_ID)!);
       const name = pick(row, LAB_NAME);
       const label = pick(row, OPTION_LABEL);
       const teacher = pick(row, TEACHER);
@@ -182,7 +183,7 @@ export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
   return found
     .map((row) => {
       const lab = pick(row, SCORE_LAB);
-      const student = pick(row, STUDENT_ID)!;
+      const student = normalizeId(pick(row, STUDENT_ID)!);
       if (lab === undefined || lab === "") {
         throw new Error(`${student} の行に研究室の列 (${LAB_ID[0]} か ${TEACHER[0]}) がありません`);
       }
@@ -207,6 +208,16 @@ function matchable(text: string): string {
   return text.normalize("NFKC").toLowerCase();
 }
 
+/**
+ * 学生 ID・研究室 ID を揃える形。
+ *
+ * 全角と半角を揃える（NFKC）。`１２３４` と `1234` は同じ学生を指しているつもりで
+ * 書かれるので、揃えないとファイルごとに同じ学生が別人になる。出力にもこの形で出す。
+ */
+export function normalizeId(text: string): string {
+  return text.normalize("NFKC").trim();
+}
+
 function findIndex(keys: readonly string[], aliases: readonly string[]): number {
   const wanted = aliases.map(matchable);
   return keys.findIndex((key) => wanted.includes(matchable(key)));
@@ -228,12 +239,13 @@ function rankOf(key: string): number | null {
 
 /** 空欄を許す数値。 */
 function optionalNumber(value: string | undefined, what: string): number | null {
-  const text = (value ?? "").replace(/[,\s　]/g, "");
+  const text = (value ?? "").normalize("NFKC").replace(/[,\s]/g, "");
   return text === "" ? null : toNumber(value, what);
 }
 
 function toNumber(value: string | undefined, what: string): number {
-  const text = (value ?? "").replace(/[,\s　]/g, "");
+  // IME のまま打たれた `６０` は 60 のつもり。桁区切りと空白も落とす
+  const text = (value ?? "").normalize("NFKC").replace(/[,\s]/g, "");
   if (text === "") throw new Error(`${what} が空です`);
   const parsed = Number(text);
   if (!Number.isFinite(parsed)) throw new Error(`${what} が数値ではありません: ${value}`);

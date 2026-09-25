@@ -503,6 +503,37 @@ describe("見出しの全角・半角", () => {
     for (const lab of instance.labs) expect(lab.scores.size).toBe(10);
   });
 
+  it("裁量点が全角数字でも読む", () => {
+    const fullwidth = eclassFiles.map((file) =>
+      file.role === "scores" && file.rows !== undefined
+        ? {
+            ...file,
+            rows: file.rows.map((row, i) => (i === 0 ? row : [...row.slice(0, 3), widen(row[3] ?? "")])),
+          }
+        : file
+    );
+    const { instance } = buildInstance(fullwidth, SEED);
+    const lab = instance.labs.find((entry) => entry.id === "L01")!;
+    expect([...lab.scores.values()].some((score) => score > 0)).toBe(true);
+  });
+
+  it("学生 ID が全角数字でも、半角で書かれた側と同じ学生として扱う", () => {
+    // 裁量点の表だけ全角。揃えないと裁量点が届かず、総合点が GPA 点だけになる
+    const fullwidth = eclassFiles.map((file) =>
+      file.role === "scores" && file.rows !== undefined
+        ? {
+            ...file,
+            rows: file.rows.map((row, i) => (i === 0 ? row : [widen(row[0] ?? ""), ...row.slice(1)])),
+          }
+        : file
+    );
+    const { instance, warnings } = buildInstance(fullwidth, SEED);
+    for (const lab of instance.labs) {
+      expect([...lab.scores.keys()].every((id) => /^[0-9]+$/.test(id))).toBe(true);
+    }
+    expect(warnings.filter((w) => /点数がありません|名簿に無い/.test(w))).toEqual([]);
+  });
+
   it("学生 ID の列が本当に無ければ、その列を名指しして止まる", () => {
     const renamed = eclassFiles.map((file) =>
       file.role === "gpa" && file.rows !== undefined

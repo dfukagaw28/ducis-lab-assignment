@@ -24,7 +24,7 @@
  */
 
 import { parseCsv } from "./csv.js";
-import type { PreferenceRow } from "./parsers.js";
+import { normalizeId, type PreferenceRow } from "./parsers.js";
 
 /**
  * 冒頭の、教材名や出力日時が書かれた行数。中身は使わない。
@@ -195,7 +195,7 @@ export function parseUserAnswers(
   return body
     .filter((row) => (row[idColumn] ?? "").trim() !== "")
     .map((row) => {
-      const id = row[idColumn]!.trim();
+      const id = normalizeId(row[idColumn]!);
       const name = nameColumn < 0 ? "" : (row[nameColumn] ?? "").trim();
       return {
         id,
