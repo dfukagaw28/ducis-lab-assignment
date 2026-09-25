@@ -477,6 +477,60 @@ describe("buildInstance（e-class と Excel のファイルから）", () => {
   });
 });
 
+describe("見出しの全角・半角", () => {
+  /** Excel の見出しは、書く人によって `学生ID` と `学生ＩＤ` が混ざる。 */
+  const widen = (text: string) =>
+    text.replace(/[A-Za-z0-9]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0xfee0));
+
+  it("`学生ＩＤ` でも学生 ID の列として読む", () => {
+    const fullwidth = eclassFiles.map((file) =>
+      file.role === "gpa" && file.rows !== undefined
+        ? { ...file, rows: file.rows.map((row, i) => (i === 0 ? row.map(widen) : row)) }
+        : file
+    );
+    const { instance } = buildInstance(fullwidth, SEED);
+    expect(instance.students).toHaveLength(10);
+    expect(instance.students.every((student) => student.gpa > 0)).toBe(true);
+  });
+
+  it("裁量点の表の見出しが全角でも読む", () => {
+    const fullwidth = eclassFiles.map((file) =>
+      file.role === "scores" && file.rows !== undefined
+        ? { ...file, rows: file.rows.map((row, i) => (i === 0 ? row.map(widen) : row)) }
+        : file
+    );
+    const { instance } = buildInstance(fullwidth, SEED);
+    for (const lab of instance.labs) expect(lab.scores.size).toBe(10);
+  });
+
+  it("学生 ID の列が本当に無ければ、その列を名指しして止まる", () => {
+    const renamed = eclassFiles.map((file) =>
+      file.role === "gpa" && file.rows !== undefined
+        ? { ...file, rows: file.rows.map((row, i) => (i === 0 ? ["番号", ...row.slice(1)] : row)) }
+        : file
+    );
+    expect(() => buildInstance(renamed, SEED)).toThrow(/学生 ID の列/);
+  });
+
+  it("研究室の名前も全角・半角の違いを無視して突き合わせる", () => {
+    const labs: SourceFile = {
+      name: "labs.csv",
+      role: "labs",
+      // 括弧を半角、区切りの空白も半角にした研究室一覧
+      text: [
+        "研究室,研究室名,定員,選択肢ラベル",
+        "L01,○○研究室,3,○○研究室(○○ ○○)",
+        "L02,△△研究室,3,△△研究室(△△ △△)",
+        "L03,□□研究室,3,□□研究室(□□ □□)",
+        "L04,◇◇研究室,3,◇◇研究室(◇◇ ◇◇)",
+      ].join("\n"),
+    };
+    const { instance } = buildInstance([...eclassFiles, labs], SEED);
+    const taro = instance.students.find((student) => student.id === "1234560002")!;
+    expect(taro.preferences).toEqual(["L04", "L01", "L03", "L02"]);
+  });
+});
+
 describe("parsePreferences", () => {
   it("第N希望の列を番号順に読む", () => {
     const rows = parsePreferences("学籍番号,氏名,第2希望,第1希望\nS1,甲,B,A\n");

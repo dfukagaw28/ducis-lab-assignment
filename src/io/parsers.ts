@@ -106,7 +106,8 @@ export function parseGpa(text: string): GpaRow[] {
 export function parseGpaRows(rows: readonly string[][]): GpaRow[] {
   const seen = new Set<string>();
   const gpa: GpaRow[] = [];
-  for (const row of withHeader(rows)) {
+  const body = withHeader(rows);
+  for (const row of body) {
     const id = pick(row, STUDENT_ID);
     if (id === undefined || id === "") continue;
     if (seen.has(id)) throw new Error(`学籍番号 ${id} が重複しています`);
@@ -119,6 +120,12 @@ export function parseGpaRows(rows: readonly string[][]): GpaRow[] {
       gpa: toNumber(pick(row, GPA), `${id} の GPA`),
     });
   }
+
+  // 行はあるのに一つも読めていないなら、見出しを取り違えている
+  if (gpa.length === 0 && body.length > 0) {
+    throw new Error(`学生 ID の列 (${STUDENT_ID[0]} など) が見つかりません`);
+  }
+
   return gpa;
 }
 
@@ -164,8 +171,15 @@ export function parseScores(text: string): ScoreRow[] {
 }
 
 export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
-  return withHeader(rows)
-    .filter((row) => (pick(row, STUDENT_ID) ?? "") !== "")
+  const body = withHeader(rows);
+  const found = body.filter((row) => (pick(row, STUDENT_ID) ?? "") !== "");
+
+  // 行はあるのに一つも読めていないなら、見出しを取り違えている
+  if (found.length === 0 && body.length > 0) {
+    throw new Error(`学生 ID の列 (${STUDENT_ID[0]} など) が見つかりません`);
+  }
+
+  return found
     .map((row) => {
       const lab = pick(row, SCORE_LAB);
       const student = pick(row, STUDENT_ID)!;
@@ -182,13 +196,26 @@ export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
     });
 }
 
+/**
+ * 見出しと別名を比べるための形に直す。
+ *
+ * 全角と半角を揃える（NFKC）。`学生ＩＤ` と `学生ID` は同じ見出しのつもりで書かれる
+ * ので、揃えないと全角で書かれた列が見つからず、その列が丸ごと無かったことになる。
+ * 大文字小文字も無視する。
+ */
+function matchable(text: string): string {
+  return text.normalize("NFKC").toLowerCase();
+}
+
 function findIndex(keys: readonly string[], aliases: readonly string[]): number {
-  return keys.findIndex((key) => aliases.some((alias) => key.toLowerCase() === alias.toLowerCase()));
+  const wanted = aliases.map(matchable);
+  return keys.findIndex((key) => wanted.includes(matchable(key)));
 }
 
 function pick(row: Record<string, string>, aliases: readonly string[]): string | undefined {
+  const wanted = aliases.map(matchable);
   for (const [key, value] of Object.entries(row)) {
-    if (aliases.some((alias) => key.toLowerCase() === alias.toLowerCase())) return value;
+    if (wanted.includes(matchable(key))) return value;
   }
   return undefined;
 }

@@ -423,9 +423,14 @@ function labLookup(labRows: readonly LabRow[]): Map<string, LabId> {
   return lookup;
 }
 
-/** 突き合わせ用の鍵。空白（全角も）の入れ方の違いは無視する。 */
+/**
+ * 突き合わせ用の鍵。
+ *
+ * 全角と半角を揃え（NFKC）、空白の入れ方の違いは無視する。`○○研究室（○○　○○）` と
+ * `○○研究室(○○ ○○)` は同じ研究室を指しているつもりで書かれる。
+ */
 function matchKey(name: string): string {
-  return name.replace(/[\s\u3000]/g, "");
+  return name.normalize("NFKC").replace(/\s/g, "");
 }
 
 /** パーサの投げるエラーに、どのファイルで起きたのかを添える。 */
