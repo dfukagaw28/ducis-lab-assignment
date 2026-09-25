@@ -577,6 +577,36 @@ describe("見出しの全角・半角", () => {
     expect(instance.labs.map((lab) => lab.id)).toEqual(["L01", "L02", "L03", "L04"]);
   });
 
+  it("教員氏名の列は別名でも但し書き付きでも読む", () => {
+    for (const heading of ["教員氏名", "教員名", "担当教員", "教員", "先生", "教員名（記入者）"]) {
+      const renamed = eclassFiles.map((file) =>
+        file.role === "scores" && file.rows !== undefined
+          ? {
+              ...file,
+              rows: file.rows.map((row, i) => (i === 0 ? [row[0]!, row[1]!, heading, row[3]!] : row)),
+            }
+          : file
+      );
+      const { instance } = buildInstance(renamed, SEED);
+      for (const lab of instance.labs) expect(lab.scores.size).toBe(10);
+    }
+  });
+
+  it("但し書き付きの見出し探しが、別の列を奪わない", () => {
+    // `教員` は教員氏名の別名で、`教員裁量点` はその頭に一致する。奪われると
+    // 点数が研究室の名前として扱われ、見当違いの場所を疑うことになる
+    const unknown = eclassFiles.map((file) =>
+      file.role === "scores" && file.rows !== undefined
+        ? {
+            ...file,
+            rows: file.rows.map((row, i) => (i === 0 ? [row[0]!, row[1]!, "記入者", row[3]!] : row)),
+          }
+        : file
+    );
+    expect(() => buildInstance(unknown, SEED)).toThrow(/研究室または教員氏名の列/);
+    expect(() => buildInstance(unknown, SEED)).not.toThrow(/研究室一覧に見つかりません/);
+  });
+
   it("裁量点の列が無ければ、空欄ではなく列が無いと言う", () => {
     const noScore = eclassFiles.map((file) =>
       file.role === "scores" && file.rows !== undefined

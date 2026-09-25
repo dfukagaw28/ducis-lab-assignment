@@ -18,7 +18,7 @@ const CAPACITY = ["定員", "受入人数", "capacity"];
 const OPTION_LABEL = ["選択肢ラベル", "eclass", "eclassラベル", "ラベル", "選択肢"];
 const GPA = ["gpa", "GPA", "成績", "評点"];
 const SCORE = ["裁量点", "教員裁量点", "点数", "得点", "評価点", "score"];
-const TEACHER = ["教員氏名", "担当教員", "教員", "教員名"];
+const TEACHER = ["教員氏名", "教員名", "担当教員", "教員", "先生"];
 /** 裁量点の表で研究室を指す列。教員ごとの Excel は教員氏名で研究室を表す。 */
 const SCORE_LAB = [...LAB_ID, ...TEACHER];
 
@@ -183,7 +183,7 @@ export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
     .map((row) => {
       const lab = pick(row, SCORE_LAB);
       const student = normalizeId(pick(row, STUDENT_ID)!);
-      if (lab === undefined) throw missingColumn("研究室または教員氏名", SCORE_LAB);
+      if (lab === undefined) throw missingColumn("研究室または教員氏名", [...TEACHER, ...LAB_ID]);
       if (lab === "") throw new Error(`${student} の行に研究室も教員氏名も書かれていません`);
 
       const score = pick(row, SCORE);
@@ -211,6 +211,19 @@ function matchable(text: string): string {
 }
 
 /**
+ * どれかの役目の見出しとして、すでに名前が付いている列。
+ *
+ * 前方一致では、こういう列を奪わない。`教員` は教員氏名の別名だが、`教員裁量点` は
+ * その頭に一致してしまう。裁量点の列だと分かっている列を教員氏名として読むと、
+ * 点数が研究室の名前として扱われ、見当違いの場所を疑うことになる。
+ */
+const NAMED_COLUMNS = new Set(
+  [STUDENT_ID, STUDENT_NAME, LAB_ID, LAB_NAME, CAPACITY, OPTION_LABEL, TEACHER, GPA, SCORE]
+    .flat()
+    .map(matchable)
+);
+
+/**
  * 学生 ID・研究室 ID を揃える形。
  *
  * 全角と半角を揃える（NFKC）。`１２３４` と `1234` は同じ学生を指しているつもりで
@@ -228,13 +241,17 @@ export function normalizeId(text: string): string {
  * ように片方が他方の頭に含まれる見出しが並んでいても取り違えないため。
  */
 
+/** 但し書きが付いた見出しか。別の役目の見出しそのものであれば、そうは扱わない。 */
+function startsWithAlias(key: string, wanted: readonly string[]): boolean {
+  const folded = matchable(key);
+  if (NAMED_COLUMNS.has(folded)) return false;
+  return wanted.some((alias) => folded.startsWith(alias));
+}
+
 function findIndex(keys: readonly string[], aliases: readonly string[]): number {
   const wanted = aliases.map(matchable);
-  const folded = keys.map(matchable);
-  const exact = folded.findIndex((key) => wanted.includes(key));
-  return exact >= 0
-    ? exact
-    : folded.findIndex((key) => wanted.some((alias) => key.startsWith(alias)));
+  const exact = keys.findIndex((key) => wanted.includes(matchable(key)));
+  return exact >= 0 ? exact : keys.findIndex((key) => startsWithAlias(key, wanted));
 }
 
 function pick(row: Record<string, string>, aliases: readonly string[]): string | undefined {
@@ -244,7 +261,7 @@ function pick(row: Record<string, string>, aliases: readonly string[]): string |
     if (wanted.includes(matchable(key))) return value;
   }
   for (const [key, value] of entries) {
-    if (wanted.some((alias) => matchable(key).startsWith(alias))) return value;
+    if (startsWithAlias(key, wanted)) return value;
   }
   return undefined;
 }
