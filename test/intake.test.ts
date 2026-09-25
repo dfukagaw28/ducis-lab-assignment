@@ -607,6 +607,24 @@ describe("見出しの全角・半角", () => {
     expect(() => buildInstance(unknown, SEED)).not.toThrow(/研究室一覧に見つかりません/);
   });
 
+  it("裁量点の欄が空なら 0 点とし、誰の分かを知らせる", () => {
+    const blanks = eclassFiles.map((file) =>
+      file.name === "教員裁量点_○○先生.xlsx" && file.rows !== undefined
+        ? {
+            ...file,
+            rows: file.rows.map((row, i) => (i === 1 || i === 3 ? [...row.slice(0, 3), ""] : row)),
+          }
+        : file
+    );
+    const { instance, warnings } = buildInstance(blanks, SEED);
+
+    const lab = instance.labs.find((entry) => entry.id === "L01")!;
+    // 行は残るので、名簿の突き合わせでは欠けたことにならない
+    expect(lab.scores.size).toBe(10);
+    expect(lab.scores.get("1234560001")).toBe(0);
+    expect(warnings.join()).toMatch(/裁量点の欄が空の学生が 2 人います（1234560001、1234560003）/);
+  });
+
   it("裁量点の列が無ければ、空欄ではなく列が無いと言う", () => {
     const noScore = eclassFiles.map((file) =>
       file.role === "scores" && file.rows !== undefined

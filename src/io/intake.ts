@@ -123,7 +123,9 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
   // どの研究室の点数がどのファイルから来たか（食い違いを指摘するときに使う）
   const scoreSources = new Map<string, Set<string>>();
   for (const file of scoreFiles) {
+    const blanks: StudentId[] = [];
     for (const row of inFile(file, () => parseScoreRows(rowsOf(file)))) {
+      if (row.blank === true) blanks.push(row.student);
       // 研究室 ID でも、研究室名でも、教員氏名でも引ける
       const forLab = scores.get(byAnyName.get(matchKey(row.lab)) ?? "");
       if (forLab === undefined) {
@@ -142,6 +144,13 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
       const sources = scoreSources.get(labId) ?? new Set<string>();
       sources.add(file.name);
       scoreSources.set(labId, sources);
+    }
+
+    if (blanks.length > 0) {
+      warnings.push(
+        `${file.name}: 裁量点の欄が空の学生が ${blanks.length} 人います` +
+          `（${list(blanks.sort())}）。0 点として扱いますが、記入漏れでないか確かめてください`
+      );
     }
   }
 

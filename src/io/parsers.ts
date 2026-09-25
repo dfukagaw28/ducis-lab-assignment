@@ -50,6 +50,8 @@ export interface ScoreRow {
   lab: string;
   student: string;
   score: number;
+  /** 欄が空だったので 0 点にした。記入漏れと区別が付かないので、intake が知らせる。 */
+  blank?: boolean;
   /** 学生氏名の列があれば。希望順位を出していない学生の氏名はここからしか取れない。 */
   name?: string;
 }
@@ -189,11 +191,15 @@ export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
       const score = pick(row, SCORE);
       if (score === undefined) throw missingColumn("裁量点", SCORE);
 
+      // 空欄は 0 点。ただし「0 点のつもり」と「書き忘れ」は見分けられないので印を残す
+      const blank = score.trim() === "";
+
       const name = pick(row, STUDENT_NAME);
       return {
         lab,
         student,
-        score: toNumber(score, `${lab} の ${student} の裁量点`),
+        score: blank ? 0 : toNumber(score, `${lab} の ${student} の裁量点`),
+        ...(blank ? { blank } : {}),
         ...(name === undefined || name === "" ? {} : { name }),
       };
     });
