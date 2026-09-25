@@ -17,7 +17,8 @@
  * ```
  *
  * 回答は `<設問1/設問2/設問3/・・・>` の 1 列にまとまっていて、`4, 1, 3, 2` のように
- * 並び順が順位、値が選択肢の番号を指す（1 位が option4、2 位が option1）。
+ * 並んでいる位置が選択肢、値がその選択肢に付けられた順位を指す（option1 が 4 位、
+ * option2 が 1 位）。
  *
  * 引用符の中に改行やカンマを含む欄（HTML のラベル）があるので、行に切ってから
  * CSV にするのではなく、ファイル全体を CSV として読んでから行を数える。
@@ -173,9 +174,9 @@ export function parseOptionLabels(parameters: readonly string[][]): Map<number, 
 /**
  * メインのブロック。学生ごとの回答を希望順位に直す。
  *
- * 回答は `4, 1, 3, 2` のように 1 列にまとまっていて、並び順が順位、値が選択肢の
- * 番号を指す（この例なら 1 位が option4、2 位が option1）。`未解答` が混じったら
- * その順位を飛ばし、後ろを繰り上げる。
+ * 回答は `4, 1, 3, 2` のように 1 列にまとまっていて、並んでいる位置が選択肢、値が
+ * その選択肢に付けられた順位を指す（この例なら option1 が 4 位、option2 が 1 位）。
+ * `未解答` の選択肢は順位が付いていないので、希望順位表から落ちる。
  */
 export function parseUserAnswers(
   block: EclassBlock,
@@ -205,35 +206,46 @@ export function parseUserAnswers(
     });
 }
 
-/** `4, 1, 3, 2` を、1 位から並べた研究室に直す。 */
+/**
+ * `4, 1, 3, 2` を、1 位から並べた研究室に直す。
+ *
+ * **並んでいる位置が選択肢**（1 つ目が option1、2 つ目が option2 …）で、**値がその
+ * 選択肢に付けられた順位**。この例なら option1 が 4 位、option2 が 1 位、option3 が
+ * 3 位、option4 が 2 位なので、希望順は option2 → option4 → option3 → option1。
+ *
+ * 位置と値のどちらが順位なのかは、`1, 2, 3, 4` のような回答では見分けが付かない。
+ * 取り違えると希望順位が丸ごと別のものになるので、テストで実例を固定してある。
+ */
 function rankedLabs(
   id: string,
   answer: string,
   labels: ReadonlyMap<number, string>
 ): string[] {
-  const preferences: string[] = [];
+  const ranked: Array<{ option: number; rank: number }> = [];
   const seen = new Set<number>();
 
-  for (const cell of answer.split(",")) {
+  answer.split(",").forEach((cell, index) => {
     const value = cell.trim();
-    if (value === "" || value === UNANSWERED) continue;
+    // 順位を付けなかった選択肢。希望順位表からは落ちる
+    if (value === "" || value === UNANSWERED) return;
 
-    const option = Number(value);
-    if (!Number.isInteger(option)) {
-      throw new Error(`${id} の回答に選択肢の番号でない値があります: ${value}`);
+    const option = index + 1;
+    if (!labels.has(option)) {
+      throw new Error(`${id} の回答に、使われていない選択肢 ${option} の順位があります`);
     }
-    const label = labels.get(option);
-    if (label === undefined) {
-      throw new Error(`${id} の回答に、選択肢にない番号 ${option} があります`);
-    }
-    if (seen.has(option)) {
-      throw new Error(`${id} の回答に選択肢 ${option} が二度出てきます`);
-    }
-    seen.add(option);
-    preferences.push(label);
-  }
 
-  return preferences;
+    const rank = Number(value);
+    if (!Number.isInteger(rank) || rank < 1) {
+      throw new Error(`${id} の回答に順位でない値があります: ${value}`);
+    }
+    if (seen.has(rank)) {
+      throw new Error(`${id} の回答に ${rank} 位が二つあります`);
+    }
+    seen.add(rank);
+    ranked.push({ option, rank });
+  });
+
+  return ranked.sort((a, b) => a.rank - b.rank).map(({ option }) => labels.get(option)!);
 }
 
 function findColumn(keys: readonly string[], aliases: readonly string[]): number {

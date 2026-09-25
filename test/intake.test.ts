@@ -231,7 +231,7 @@ describe("buildInstance（e-class と Excel のファイルから）", () => {
     const taro = instance.students.find((student) => student.id === "1234560002")!;
     expect(taro.name).toBe("架空　太郎");
     // 回答は 4, 1, 3, 2
-    expect(taro.preferences).toEqual(["L04", "L01", "L03", "L02"]);
+    expect(taro.preferences).toEqual(["L02", "L04", "L03", "L01"]);
   });
 
   it("回答しなかった学生は希望なしのまま通す", () => {
@@ -295,7 +295,7 @@ describe("buildInstance（e-class と Excel のファイルから）", () => {
     );
     const { instance } = buildInstance(byName, SEED);
     const taro = instance.students.find((student) => student.id === "1234560002")!;
-    expect(taro.preferences).toEqual(["L04", "L01", "L03", "L02"]);
+    expect(taro.preferences).toEqual(["L02", "L04", "L03", "L01"]);
   });
 
   it("空白の入れ方が違っても突き合わせる", () => {
@@ -417,7 +417,7 @@ describe("buildInstance（e-class と Excel のファイルから）", () => {
     // 選択肢ラベルの括弧の中を教員氏名とみて、裁量点のファイルと繋がる
     expect(instance.labs.every((lab) => lab.scores.size === 10)).toBe(true);
     const taro = instance.students.find((student) => student.id === "1234560002")!;
-    expect(taro.preferences).toEqual(["L04", "L01", "L03", "L02"]);
+    expect(taro.preferences).toEqual(["L02", "L04", "L03", "L01"]);
   });
 
   it("誰も挙げなかった研究室も選択肢から拾う", () => {
@@ -785,7 +785,7 @@ describe("見出しの全角・半角", () => {
     };
     const { instance } = buildInstance([...eclassFiles, labs], SEED);
     const taro = instance.students.find((student) => student.id === "1234560002")!;
-    expect(taro.preferences).toEqual(["L04", "L01", "L03", "L02"]);
+    expect(taro.preferences).toEqual(["L02", "L04", "L03", "L01"]);
   });
 });
 

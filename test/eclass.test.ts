@@ -221,21 +221,22 @@ describe("parseUserAnswers", () => {
     };
   }
 
-  it("並び順が順位、値が選択肢の番号", () => {
-    // 1 位が option4、2 位が option1、3 位が option3、4 位が option2
+  it("並び順が選択肢、値がその選択肢の順位", () => {
+    // option1 が 4 位、option2 が 1 位、option3 が 3 位、option4 が 2 位
     const rows = parseUserAnswers(block(["科目", "架空 太郎", "S001", "時刻", "4, 1, 3, 2"]), labels);
     expect(rows).toEqual([
       {
         id: "S001",
         name: "架空 太郎",
-        preferences: ["◇◇研究室", "○○研究室", "□□研究室", "△△研究室"],
+        preferences: ["△△研究室", "◇◇研究室", "□□研究室", "○○研究室"],
       },
     ]);
   });
 
-  it("未解答は飛ばして順位を詰める", () => {
+  it("順位を付けなかった研究室は落ちる", () => {
+    // option1 が 4 位、option3 が 3 位。option2 と option4 は順位なし
     const rows = parseUserAnswers(block(["科目", "甲", "S001", "時刻", "4, 未解答, 3, 未解答"]), labels);
-    expect(rows[0]!.preferences).toEqual(["◇◇研究室", "□□研究室"]);
+    expect(rows[0]!.preferences).toEqual(["□□研究室", "○○研究室"]);
   });
 
   it("全部未解答なら希望なしとして通す", () => {
@@ -244,16 +245,22 @@ describe("parseUserAnswers", () => {
     expect(rows[0]!.preferences).toEqual([]);
   });
 
-  it("選択肢にない番号があれば止まる", () => {
+  it("選択肢の数より多く順位が並んでいれば止まる", () => {
     expect(() =>
-      parseUserAnswers(block(["科目", "甲", "S001", "時刻", "9, 1"]), labels)
-    ).toThrow(/選択肢にない番号 9/);
+      parseUserAnswers(block(["科目", "甲", "S001", "時刻", "1, 2, 3, 4, 5"]), labels)
+    ).toThrow(/選択肢 5/);
   });
 
-  it("同じ選択肢が二度出てきたら止まる", () => {
+  it("順位でない値があれば止まる", () => {
+    expect(() =>
+      parseUserAnswers(block(["科目", "甲", "S001", "時刻", "1, ア"]), labels)
+    ).toThrow(/順位でない値/);
+  });
+
+  it("同じ順位が二度出てきたら止まる", () => {
     expect(() =>
       parseUserAnswers(block(["科目", "甲", "S001", "時刻", "1, 1"]), labels)
-    ).toThrow(/二度/);
+    ).toThrow(/1 位が二つ/);
   });
 
   it("学生 ID の空の行を落とす", () => {
@@ -279,11 +286,12 @@ describe("parseEclassPreferences（実ファイルの見本）", () => {
   });
 
   it("回答 4, 1, 3, 2 を 1 位から並べ直す", () => {
+    // ○○ が 4 位、△△ が 1 位、□□ が 3 位、◇◇ が 2 位
     expect(rows[0]!.preferences).toEqual([
-      "◇◇研究室（◇◇　◇◇）",
-      "○○研究室（○○　○○）",
-      "□□研究室（□□　□□）",
       "△△研究室（△△　△△）",
+      "◇◇研究室（◇◇　◇◇）",
+      "□□研究室（□□　□□）",
+      "○○研究室（○○　○○）",
     ]);
   });
 
