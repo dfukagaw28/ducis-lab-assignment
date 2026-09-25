@@ -169,7 +169,9 @@ describe("preferencesCsv", () => {
   const at = (name: string) => header.indexOf(name);
 
   it("学生ごとに、全研究室を 1 行ずつ並べる", () => {
-    expect(header).toEqual(["学籍番号", "氏名", "順位", "研究室", "研究室名", "出所", "配属"]);
+    expect(header).toEqual([
+      "学籍番号", "氏名", "順位", "研究室", "研究室名", "定員", "研究室での順位", "出所", "配属",
+    ]);
     expect(body).toHaveLength(instance.students.length * instance.labs.length);
   });
 
@@ -193,6 +195,34 @@ describe("preferencesCsv", () => {
     const absent = instance.students.find((student) => student.preferences.length === 0)!;
     const mine = body.filter((row) => row[0] === absent.id);
     expect(mine.every((row) => row[at("出所")] === "補完")).toBe(true);
+  });
+
+  it("研究室での順位は、研究室の並び（rankingCsv）と同じものを指す", () => {
+    const ranking = parseCsv(rankingCsv(instance, assignment));
+    const rankHeader = ranking[0]!;
+    const rank = new Map(
+      ranking
+        .slice(1)
+        .map((row) => [
+          `${row[0]}\t${row[rankHeader.indexOf("学籍番号")]}`,
+          row[rankHeader.indexOf("順位")],
+        ])
+    );
+
+    for (const row of body) {
+      expect(row[at("研究室での順位")]).toBe(rank.get(`${row[at("研究室")]}\t${row[0]}`));
+    }
+  });
+
+  it("配属された研究室での順位は、定員以内か、それより上の希望に入れなかった結果", () => {
+    for (const student of instance.students) {
+      const mine = body.filter((row) => row[0] === student.id);
+      const placed = mine.find((row) => row[at("配属")] === "○")!;
+      // 上の希望はすべて、定員の中に入れなかった研究室
+      for (const row of mine.slice(0, mine.indexOf(placed))) {
+        expect(Number(row[at("研究室での順位")])).toBeGreaterThan(Number(row[at("定員")]));
+      }
+    }
   });
 
   it("配属先に ○ が 1 つだけ付く", () => {
