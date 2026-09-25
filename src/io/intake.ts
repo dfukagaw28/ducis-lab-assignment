@@ -179,6 +179,21 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
   // 希望順位を出していない学生も配属の対象にする。順位を一つも付けていない扱いに
   // なるので、全研究室がランダムな順になる（domain/preferences.ts）。
   const ranked = new Set(students.map((student) => student.id));
+
+  /*
+   * 一人も一致しないなら、それは「全員が未提出」ではなく、二つのファイルで学生 ID の
+   * 書き方が違うということ。そのまま進めると、GPA 側の全員が別人として名簿に足され、
+   * 定員もその人数で決まってしまう。警告では見過ごされるので止める。
+   */
+  const matched = [...gpa.keys()].filter((id) => ranked.has(id));
+  if (matched.length === 0 && gpa.size > 0 && students.length > 0) {
+    throw new Error(
+      `GPA のファイルと希望順位のファイルで、学生 ID が一つも一致しません` +
+        `（希望順位: ${students[0]!.id} / GPA: ${[...gpa.keys()][0]!}）。` +
+        `同じ学生を指しているなら、ID の書き方を揃えてください`
+    );
+  }
+
   const absent = [...gpa.keys()].filter((id) => !ranked.has(id)).sort();
   for (const id of absent) {
     const name = namesFromGpa.get(id) ?? namesFromScores.get(id);

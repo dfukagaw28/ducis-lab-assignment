@@ -138,7 +138,24 @@ function valueOf(cell: Element, shared: readonly string[]): string {
 
   if (type === "s") return shared[Number(text)] ?? "";
   if (type === "b") return text === "1" ? "TRUE" : "FALSE";
-  return text;
+  return numberText(text);
+}
+
+/**
+ * 数値セルを、Excel の画面で見えている表記に直す。
+ *
+ * 保存されている文字列はそのままだと `1234560001.0` や `1.234560001E+09` のことが
+ * ある（書き出した道具によって変わる）。学籍番号が数値のセルに入っていると、
+ * これが ID になってしまい、文字列で書かれた側の ID と一致しなくなる。整数として
+ * 表せる値は整数の桁で返す。
+ *
+ * 整数で表せないものは触らない。`3.97` を `Number` 経由で作り直しても得るものが無く、
+ * 桁の多い値では逆に精度を落とすため。
+ */
+function numberText(text: string): string {
+  const value = Number(text);
+  // 2^53 より小さければ整数の桁が正確に表せる
+  return Number.isInteger(value) && Math.abs(value) < 1e15 ? String(value) : text;
 }
 
 /** `C12` の `C` を 0 始まりの列番号にする。参照が無ければ -1。 */

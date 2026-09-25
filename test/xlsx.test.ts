@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { zipSync } from "fflate";
+
 import { readWorkbook, sheetOf } from "../src/io/xlsx.js";
 
 // jsdom の下では import.meta.url がファイルの場所を指さないので、実行位置から辿る
@@ -81,6 +83,61 @@ describe("readWorkbook（記入済みの中身）", () => {
 
   it("学生 10 人ぶんある", () => {
     expect(rows).toHaveLength(11);
+  });
+});
+
+describe("数値セルの表記", () => {
+  /** セル 1 つだけの最小の .xlsx を組み立てる。 */
+  function sheetWith(cell: string): string[][] {
+    const main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const rel = "http://schemas.openxmlformats.org/package/2006/relationships";
+    const doc = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const files: Record<string, Uint8Array> = {};
+    const put = (path: string, xml: string) => {
+      files[path] = new TextEncoder().encode(xml);
+    };
+    put(
+      "[Content_Types].xml",
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+        `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+        `<Default Extension="xml" ContentType="application/xml"/>` +
+        `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+        `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+        `</Types>`
+    );
+    put(
+      "_rels/.rels",
+      `<Relationships xmlns="${rel}"><Relationship Id="rId1" Type="${doc}/officeDocument" Target="xl/workbook.xml"/></Relationships>`
+    );
+    put(
+      "xl/workbook.xml",
+      `<workbook xmlns="${main}" xmlns:r="${doc}"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>`
+    );
+    put(
+      "xl/_rels/workbook.xml.rels",
+      `<Relationships xmlns="${rel}"><Relationship Id="rId1" Type="${doc}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`
+    );
+    put(
+      "xl/worksheets/sheet1.xml",
+      `<worksheet xmlns="${main}"><sheetData><row r="1">${cell}</row></sheetData></worksheet>`
+    );
+    return sheetOf(readWorkbook(zipSync(files))).rows;
+  }
+
+  it("整数は、書き方が違っても同じ桁で読む", () => {
+    // 学籍番号が数値のセルに入っていると、道具によって書き方が変わる
+    expect(sheetWith(`<c r="A1"><v>1234560001</v></c>`)[0]).toEqual(["1234560001"]);
+    expect(sheetWith(`<c r="A1"><v>1234560001.0</v></c>`)[0]).toEqual(["1234560001"]);
+    expect(sheetWith(`<c r="A1"><v>1.234560001E+09</v></c>`)[0]).toEqual(["1234560001"]);
+  });
+
+  it("小数はそのまま渡す", () => {
+    expect(sheetWith(`<c r="A1"><v>3.97</v></c>`)[0]).toEqual(["3.97"]);
+    expect(sheetWith(`<c r="A1"><v>0.5</v></c>`)[0]).toEqual(["0.5"]);
+  });
+
+  it("文字列のセルは触らない（先頭の 0 を落とさない）", () => {
+    expect(sheetWith(`<c r="A1" t="inlineStr"><is><t>0012</t></is></c>`)[0]).toEqual(["0012"]);
   });
 });
 

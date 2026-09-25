@@ -250,6 +250,22 @@ describe("buildInstance（e-class と Excel のファイルから）", () => {
     expect(warnings.join()).toMatch(/1 人が希望順位を出していません（1234560007）/);
   });
 
+  it("学生 ID が一つも一致しなければ、全員未提出とはみなさず止まる", () => {
+    // GPA 側の ID の書き方が違う（末尾に .0 が付いた、など）場合を想定する
+    const shifted = eclassFiles.map((file) =>
+      file.role === "gpa" && file.rows !== undefined
+        ? {
+            ...file,
+            rows: file.rows.map((row, index) =>
+              index === 0 ? row : [`${row[0]}.0`, ...row.slice(1)]
+            ),
+          }
+        : file
+    );
+    // 進めてしまうと、GPA 側の 10 人が別人として名簿に足され、定員もその人数で決まる
+    expect(() => buildInstance(shifted, SEED)).toThrow(/一つも一致しません/);
+  });
+
   it("希望順位を出していない学生の氏名を裁量点の表から取る", () => {
     const withExcel: SourceFile[] = [
       ...eclassFiles.filter((file) => file.role !== "scores"),
