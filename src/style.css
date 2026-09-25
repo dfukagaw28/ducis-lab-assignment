@@ -16,6 +16,13 @@ body {
   color: var(--muted);
 }
 
+.version {
+  color: var(--muted);
+  font-size: 0.85rem;
+  /* コミットIDは等幅で見比べられるようにする */
+  font-variant-numeric: tabular-nums;
+}
+
 .boot {
   padding: 1rem;
   border: 1px solid var(--border);

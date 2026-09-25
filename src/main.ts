@@ -24,12 +24,17 @@ import {
 } from "./io/export.js";
 import { seedFromInput } from "./domain/seed.js";
 import { buildInstance } from "./io/intake.js";
+import { versionLine } from "./version.js";
 import { createDropZone, message } from "./ui/dropzone.js";
 import { renderMessages, renderReport } from "./ui/render.js";
 import { renderSensitivity } from "./ui/sensitivity.js";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) throw new Error("#app is missing from index.html");
+
+// どのコードが出した結果なのかを、画面にもサマリにも同じ形で残す
+const versionBox = document.querySelector<HTMLElement>("#version");
+if (versionBox !== null) versionBox.textContent = `バージョン ${versionLine()}`;
 
 app.innerHTML = `
   <section class="panel">

@@ -6,9 +6,14 @@ describe("page", () => {
   let app: HTMLElement;
 
   beforeAll(async () => {
-    document.body.innerHTML = `<main id="app"></main>`;
+    document.body.innerHTML = `<p id="version"></p><main id="app"></main>`;
     await import("../src/main.js");
     app = document.querySelector<HTMLElement>("#app")!;
+  });
+
+  it("どのコードで動いているかを画面に出す", () => {
+    // 結果を見ている人が、版を尋ねずに読み取れること
+    expect(document.querySelector("#version")!.textContent).toContain("バージョン");
   });
 
   it("シードは既定で手入力できない（入力データから導く）", () => {

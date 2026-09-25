@@ -23,7 +23,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 履歴とタグごと取る。ビルドが git describe で版を埋めるので、浅いと
+      # タグが見えず、短縮ハッシュだけになる
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:

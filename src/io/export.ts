@@ -8,6 +8,7 @@ import type { Report } from "../domain/report.js";
 import { completedPreferences } from "../domain/preferences.js";
 import type { Assignment } from "../domain/solve.js";
 import type { Instance, Params } from "../domain/types.js";
+import { VERSION } from "../version.js";
 import { toCsv, type CsvValue } from "./csv.js";
 
 export function studentsCsv(instance: Instance, report: Report): string {
@@ -204,6 +205,9 @@ export function summaryRows(report: Report, params: Params, seedSource: string):
   const { summary } = report;
   const rows: CsvValue[][] = [
     ["項目", "値"],
+    // 保存した結果ファイル自身が、どのコードで計算されたかを持ち歩く
+    ["バージョン", VERSION.commit],
+    ["ビルド日時", VERSION.builtAt],
     ["抽選シード", summary.seed],
     ["シードの決め方", seedSource],
     ["GPA 配点", params.gpaWeight],

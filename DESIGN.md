@@ -50,6 +50,7 @@ GPA の .xlsx    ─┼→ io/ のパーサ ─→ 行と列 ─→ io/intake.ts
 src/
   main.ts              画面の配線
   nodeStub.ts          node:fs / node:path の代わり（下の「ライブラリの注意」）
+  version.ts           ビルド時に埋め込むコミットと日時（vite.config.ts の define）
   domain/
     types.ts           正規化データモデル（Student / Lab / Instance / Params）
     score.ts           総合点 → 研究室の選好リスト

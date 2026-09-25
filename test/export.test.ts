@@ -17,6 +17,7 @@ import {
   summaryCsv,
 } from "../src/io/export.js";
 import { buildInstance, type SourceFile } from "../src/io/intake.js";
+import { VERSION } from "../src/version.js";
 import { readWorkbook, sheetOf } from "../src/io/xlsx.js";
 
 function sheetRows(name: string, sheet: string): string[][] {
@@ -100,6 +101,13 @@ describe("summaryCsv", () => {
     expect(text).toContain("シードの決め方,手で指定");
     expect(text).toContain(`GPA 配点,${params.gpaWeight}`);
     expect(text).toContain(`裁量点 配点,${params.discretionaryWeight}`);
+  });
+
+  it("どのコードで計算したかを残す", () => {
+    // テストは vite の define を通らないので「不明」になる。値ではなく、
+    // 行が残ること自体を見る
+    expect(text).toContain(`バージョン,${VERSION.commit}`);
+    expect(text).toContain(`ビルド日時,${VERSION.builtAt}`);
   });
 
   it("希望順位の内訳を書く", () => {
