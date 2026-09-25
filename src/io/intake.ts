@@ -17,6 +17,7 @@ import {
   parseScoreRows,
   type LabRow,
   type PreferenceRow,
+  type ScoreSheet,
 } from "./parsers.js";
 
 export const ROLES = ["preferences", "gpa", "labs", "scores"] as const;
@@ -123,24 +124,35 @@ export function buildInstance(files: readonly SourceFile[], seed?: number): Buil
   // どの研究室の点数がどのファイルから来たか（食い違いを指摘するときに使う）
   const scoreSources = new Map<string, Set<string>>();
   for (const file of scoreFiles) {
+    const sheet = inFile(file, () => parseScoreRows(rowsOf(file)));
+    const only = soleLab(file, sheet, warnings);
     const blanks: StudentId[] = [];
-    for (const row of inFile(file, () => parseScoreRows(rowsOf(file)))) {
+
+    for (const row of sheet.rows) {
       if (row.blank === true) blanks.push(row.student);
+      // 教員氏名が書かれていない行は、そのファイルの教員のものとして埋める
+      const where = row.lab === "" ? only : row.lab;
+      if (where === undefined) {
+        throw new Error(
+          `${file.name}: ${row.student} の行に教員氏名がありません。` +
+            `ファイルの中に教員氏名が複数あるので、どちらのものか決められません`
+        );
+      }
       // 研究室 ID でも、研究室名でも、教員氏名でも引ける
-      const forLab = scores.get(byAnyName.get(matchKey(row.lab)) ?? "");
+      const forLab = scores.get(byAnyName.get(matchKey(where)) ?? "");
       if (forLab === undefined) {
         throw new Error(
-          `${file.name}: 「${row.lab}」が研究室一覧に見つかりません。` +
+          `${file.name}: 「${where}」が研究室一覧に見つかりません。` +
             `研究室一覧の「${TEACHER_COLUMN}」列に、裁量点ファイルの教員氏名を入れてください`
         );
       }
       if (forLab.has(row.student)) {
-        warnings.push(`${file.name}: ${row.lab} の ${row.student} の裁量点が重複しています`);
+        warnings.push(`${file.name}: ${where} の ${row.student} の裁量点が重複しています`);
       }
       forLab.set(row.student, row.score);
       if (row.name !== undefined) namesFromScores.set(row.student, row.name);
 
-      const labId = byAnyName.get(matchKey(row.lab))!;
+      const labId = byAnyName.get(matchKey(where))!;
       const sources = scoreSources.get(labId) ?? new Set<string>();
       sources.add(file.name);
       scoreSources.set(labId, sources);
@@ -292,6 +304,40 @@ function resolveCapacities(
       (extra.length === 0 ? "" : `、希望の多い ${extra.join("、")} は +1 人`)
   );
   return capacities;
+}
+
+/**
+ * そのファイルが指している研究室を一つに決める。
+ *
+ * 教員ごとの Excel は一人の教員のものなので、教員氏名はどの行も同じはず。書かれて
+ * いる名前が一つなら、空の行はそれで埋める（全行に書いてもらう必要はない）。
+ * 二つ以上あれば前提が崩れているので知らせる。一つも無ければ、どの研究室の点数か
+ * 決めようがないので止める。
+ *
+ * 研究室の列でまとめた CSV は複数の研究室が並ぶのが普通なので、そちらは数えない。
+ */
+function soleLab(
+  file: SourceFile,
+  sheet: ScoreSheet,
+  warnings: string[]
+): string | undefined {
+  const named = [...new Set(sheet.rows.map((row) => row.lab).filter((lab) => lab !== ""))];
+  const what = sheet.byTeacher ? "教員氏名" : "研究室";
+
+  if (named.length === 0) {
+    throw new Error(`${file.name}: ${what}がどの行にも書かれていません`);
+  }
+  if (named.length > 1) {
+    if (sheet.byTeacher) {
+      warnings.push(
+        `${file.name}: 教員氏名が ${named.length} 種類あります（${named.join("、")}）。` +
+          `1 つのファイルは 1 人の教員のもののはずです`
+      );
+    }
+    // どれで埋めればよいか決められないので、空の行は後で個別に断る
+    return undefined;
+  }
+  return named[0];
 }
 
 /**

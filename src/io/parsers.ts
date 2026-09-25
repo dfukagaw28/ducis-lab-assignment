@@ -19,8 +19,7 @@ const OPTION_LABEL = ["選択肢ラベル", "eclass", "eclassラベル", "ラベ
 const GPA = ["gpa", "GPA", "成績", "評点"];
 const SCORE = ["裁量点", "教員裁量点", "点数", "得点", "評価点", "score"];
 const TEACHER = ["教員氏名", "教員名", "担当教員", "教員", "先生"];
-/** 裁量点の表で研究室を指す列。教員ごとの Excel は教員氏名で研究室を表す。 */
-const SCORE_LAB = [...LAB_ID, ...TEACHER];
+
 
 export interface PreferenceRow {
   id: string;
@@ -46,7 +45,19 @@ export interface LabRow {
   teacher?: string;
 }
 
+export interface ScoreSheet {
+  rows: ScoreRow[];
+  /**
+   * 研究室の列ではなく、教員氏名の列で研究室を指していたか。
+   *
+   * 教員ごとの Excel は教員氏名で指す（1 ファイル 1 人）。研究室の列でまとめた
+   * CSV は複数の研究室が並ぶのが普通なので、扱いを分ける必要がある。
+   */
+  byTeacher: boolean;
+}
+
 export interface ScoreRow {
+  /** 研究室 ID、研究室名、または教員氏名。空のことがあり、intake が埋める。 */
   lab: string;
   student: string;
   score: number;
@@ -170,23 +181,26 @@ export function parseLabRows(rows: readonly string[][]): LabRow[] {
  * 教員ごとの Excel（`学生ID,学生氏名,教員氏名,教員裁量点`）も同じ形として読める。
  * 研究室を指すのが研究室 ID か教員氏名かの違いで、どちらも研究室一覧で引ける。
  */
-export function parseScores(text: string): ScoreRow[] {
+export function parseScores(text: string): ScoreSheet {
   return parseScoreRows(parseCsv(text));
 }
 
-export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
+export function parseScoreRows(rows: readonly string[][]): ScoreSheet {
   const body = withHeader(rows);
   const found = body.filter((row) => (pick(row, STUDENT_ID) ?? "") !== "");
 
   // 行はあるのに一つも読めていないなら、見出しを取り違えている
   if (found.length === 0 && body.length > 0) throw missingColumn("学生ID", STUDENT_ID);
 
-  return found
+  // 研究室の列があればそちら、無ければ教員氏名の列で研究室を指している
+  const byTeacher = found.length > 0 && pick(found[0]!, LAB_ID) === undefined;
+  const labColumn = byTeacher ? TEACHER : LAB_ID;
+
+  const parsed = found
     .map((row) => {
-      const lab = pick(row, SCORE_LAB);
+      const lab = pick(row, labColumn);
       const student = normalizeId(pick(row, STUDENT_ID)!);
       if (lab === undefined) throw missingColumn("研究室または教員氏名", [...TEACHER, ...LAB_ID]);
-      if (lab === "") throw new Error(`${student} の行に研究室も教員氏名も書かれていません`);
 
       const score = pick(row, SCORE);
       if (score === undefined) throw missingColumn("裁量点", SCORE);
@@ -196,13 +210,15 @@ export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
 
       const name = pick(row, STUDENT_NAME);
       return {
-        lab,
+        lab: lab.trim(),
         student,
         score: blank ? 0 : toNumber(score, `${lab} の ${student} の裁量点`),
         ...(blank ? { blank } : {}),
         ...(name === undefined || name === "" ? {} : { name }),
       };
     });
+
+  return { rows: parsed, byTeacher };
 }
 
 /**

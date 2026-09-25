@@ -607,6 +607,76 @@ describe("見出しの全角・半角", () => {
     expect(() => buildInstance(unknown, SEED)).not.toThrow(/研究室一覧に見つかりません/);
   });
 
+  describe("1 つのファイルは 1 人の教員のもの", () => {
+    /** ○○先生のファイルだけに手を入れる */
+    const only = (f: (row: string[], index: number) => string[]) =>
+      eclassFiles.map((file) =>
+        file.name === "教員裁量点_○○先生.xlsx" && file.rows !== undefined
+          ? { ...file, rows: file.rows.map(f) }
+          : file
+      );
+    const blankTeacher = (row: string[]) => [row[0]!, row[1]!, "", row[3]!];
+
+    it("1 行でも書かれていれば、空の行をその教員で埋める", () => {
+      const sparse = only((row, i) => (i <= 1 ? row : blankTeacher(row)));
+      const { instance, warnings } = buildInstance(sparse, SEED);
+      expect(instance.labs.find((lab) => lab.id === "L01")!.scores.size).toBe(10);
+      expect(warnings.filter((w) => /教員氏名/.test(w))).toEqual([]);
+    });
+
+    it("書かれているのが最後の 1 行でも埋める", () => {
+      const sparse = only((row, i) => (i === 0 || i === 10 ? row : blankTeacher(row)));
+      const { instance } = buildInstance(sparse, SEED);
+      expect(instance.labs.find((lab) => lab.id === "L01")!.scores.size).toBe(10);
+    });
+
+    it("教員氏名が 2 種類あれば知らせる", () => {
+      const mixed = only((row, i) => (i === 3 ? [row[0]!, row[1]!, "△△　△△", row[3]!] : row));
+      const { warnings } = buildInstance(mixed, SEED);
+      expect(warnings.join()).toMatch(/教員氏名が 2 種類あります（○○　○○、△△　△△）/);
+    });
+
+    it("2 種類あって空の行もあれば、どちらで埋めるか決められないので止まる", () => {
+      const mixed = only((row, i) =>
+        i === 3 ? [row[0]!, row[1]!, "△△　△△", row[3]!] : i <= 1 ? row : blankTeacher(row)
+      );
+      expect(() => buildInstance(mixed, SEED)).toThrow(/どちらのものか決められません/);
+    });
+
+    it("1 つも書かれていなければ止まる", () => {
+      const none = only((row, i) => (i === 0 ? row : blankTeacher(row)));
+      expect(() => buildInstance(none, SEED)).toThrow(/教員氏名がどの行にも書かれていません/);
+    });
+
+    it("研究室の列でまとめた CSV は、複数の研究室が並んでも知らせない", () => {
+      const combined: SourceFile = {
+        name: "scores.csv",
+        role: "scores",
+        text: ["研究室,学籍番号,裁量点"]
+          .concat(
+            ["L01", "L02", "L03", "L04"].flatMap((lab) =>
+              Array.from({ length: 10 }, (_, i) => `${lab},123456000${i + 1},30`)
+            )
+          )
+          .join("\n"),
+      };
+      const labs: SourceFile = {
+        name: "labs.csv",
+        role: "labs",
+        text: [
+          "研究室,選択肢ラベル",
+          "L01,○○研究室（○○　○○）",
+          "L02,△△研究室（△△　△△）",
+          "L03,□□研究室（□□　□□）",
+          "L04,◇◇研究室（◇◇　◇◇）",
+        ].join("\n"),
+      };
+      const files = [...eclassFiles.filter((file) => file.role !== "scores"), combined, labs];
+      const { warnings } = buildInstance(files, SEED);
+      expect(warnings.filter((w) => /種類あります/.test(w))).toEqual([]);
+    });
+  });
+
   it("裁量点の欄が空なら 0 点とし、誰の分かを知らせる", () => {
     const blanks = eclassFiles.map((file) =>
       file.name === "教員裁量点_○○先生.xlsx" && file.rows !== undefined
