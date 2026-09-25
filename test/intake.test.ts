@@ -534,13 +534,65 @@ describe("見出しの全角・半角", () => {
     expect(warnings.filter((w) => /点数がありません|名簿に無い/.test(w))).toEqual([]);
   });
 
+  it("見出しに但し書きが付いていても読む", () => {
+    // 教員に配る表の見出しは、注意書きを足されることがある
+    const annotated = eclassFiles.map((file) => {
+      if (file.rows === undefined) return file;
+      if (file.role === "scores") {
+        return {
+          ...file,
+          rows: file.rows.map((row, i) =>
+            i === 0 ? [row[0]!, row[1]!, "教員氏名（リストから選択）", "裁量点最大60"] : row
+          ),
+        };
+      }
+      if (file.role === "gpa") {
+        return {
+          ...file,
+          rows: file.rows.map((row, i) => (i === 0 ? ["学生ID（学籍番号）", row[1]!, "GPA（4.0満点）"] : row)),
+        };
+      }
+      return file;
+    });
+    const { instance } = buildInstance(annotated, SEED);
+    expect(instance.students.every((student) => student.gpa > 0)).toBe(true);
+    for (const lab of instance.labs) expect(lab.scores.size).toBe(10);
+  });
+
+  it("似た見出しが並んでいても取り違えない", () => {
+    // `研究室` と `研究室名` は片方が他方の頭に含まれる。完全一致を先に見るので
+    // 研究室 ID の列が研究室名の列に取られない
+    const labs: SourceFile = {
+      name: "labs.csv",
+      role: "labs",
+      text: [
+        "研究室名,研究室,定員,選択肢ラベル",
+        "○○研究室,L01,3,○○研究室（○○　○○）",
+        "△△研究室,L02,3,△△研究室（△△　△△）",
+        "□□研究室,L03,3,□□研究室（□□　□□）",
+        "◇◇研究室,L04,3,◇◇研究室（◇◇　◇◇）",
+      ].join("\n"),
+    };
+    const { instance } = buildInstance([...eclassFiles, labs], SEED);
+    expect(instance.labs.map((lab) => lab.id)).toEqual(["L01", "L02", "L03", "L04"]);
+  });
+
+  it("裁量点の列が無ければ、空欄ではなく列が無いと言う", () => {
+    const noScore = eclassFiles.map((file) =>
+      file.role === "scores" && file.rows !== undefined
+        ? { ...file, rows: file.rows.map((row, i) => (i === 0 ? [...row.slice(0, 3), "備考"] : row)) }
+        : file
+    );
+    expect(() => buildInstance(noScore, SEED)).toThrow(/裁量点の列 .* が見つかりません/);
+  });
+
   it("学生 ID の列が本当に無ければ、その列を名指しして止まる", () => {
     const renamed = eclassFiles.map((file) =>
       file.role === "gpa" && file.rows !== undefined
         ? { ...file, rows: file.rows.map((row, i) => (i === 0 ? ["番号", ...row.slice(1)] : row)) }
         : file
     );
-    expect(() => buildInstance(renamed, SEED)).toThrow(/学生 ID の列/);
+    expect(() => buildInstance(renamed, SEED)).toThrow(/学生IDの列 .* が見つかりません/);
   });
 
   it("研究室の名前も全角・半角の違いを無視して突き合わせる", () => {

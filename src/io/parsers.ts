@@ -70,7 +70,7 @@ export function parsePreferenceRows(rows: readonly string[][]): PreferenceRow[] 
 
   const keys = header.map((cell) => cell.replace(/^[\s　]+|[\s　]+$/g, ""));
   const idIndex = findIndex(keys, STUDENT_ID);
-  if (idIndex < 0) throw new Error(`学籍番号の列 (${STUDENT_ID[0]}) が見つかりません`);
+  if (idIndex < 0) throw missingColumn("学籍番号", STUDENT_ID);
   const nameIndex = findIndex(keys, STUDENT_NAME);
 
   const numbered = keys
@@ -114,18 +114,19 @@ export function parseGpaRows(rows: readonly string[][]): GpaRow[] {
     if (seen.has(id)) throw new Error(`学籍番号 ${id} が重複しています`);
     seen.add(id);
 
+    const score = pick(row, GPA);
+    if (score === undefined) throw missingColumn("GPA", GPA);
+
     const name = pick(row, STUDENT_NAME);
     gpa.push({
       id,
       ...(name === undefined || name === "" ? {} : { name }),
-      gpa: toNumber(pick(row, GPA), `${id} の GPA`),
+      gpa: toNumber(score, `${id} の GPA`),
     });
   }
 
   // 行はあるのに一つも読めていないなら、見出しを取り違えている
-  if (gpa.length === 0 && body.length > 0) {
-    throw new Error(`学生 ID の列 (${STUDENT_ID[0]} など) が見つかりません`);
-  }
+  if (gpa.length === 0 && body.length > 0) throw missingColumn("学生ID", STUDENT_ID);
 
   return gpa;
 }
@@ -176,22 +177,23 @@ export function parseScoreRows(rows: readonly string[][]): ScoreRow[] {
   const found = body.filter((row) => (pick(row, STUDENT_ID) ?? "") !== "");
 
   // 行はあるのに一つも読めていないなら、見出しを取り違えている
-  if (found.length === 0 && body.length > 0) {
-    throw new Error(`学生 ID の列 (${STUDENT_ID[0]} など) が見つかりません`);
-  }
+  if (found.length === 0 && body.length > 0) throw missingColumn("学生ID", STUDENT_ID);
 
   return found
     .map((row) => {
       const lab = pick(row, SCORE_LAB);
       const student = normalizeId(pick(row, STUDENT_ID)!);
-      if (lab === undefined || lab === "") {
-        throw new Error(`${student} の行に研究室の列 (${LAB_ID[0]} か ${TEACHER[0]}) がありません`);
-      }
+      if (lab === undefined) throw missingColumn("研究室または教員氏名", SCORE_LAB);
+      if (lab === "") throw new Error(`${student} の行に研究室も教員氏名も書かれていません`);
+
+      const score = pick(row, SCORE);
+      if (score === undefined) throw missingColumn("裁量点", SCORE);
+
       const name = pick(row, STUDENT_NAME);
       return {
         lab,
         student,
-        score: toNumber(pick(row, SCORE), `${lab} の ${student} の裁量点`),
+        score: toNumber(score, `${lab} の ${student} の裁量点`),
         ...(name === undefined || name === "" ? {} : { name }),
       };
     });
@@ -218,17 +220,38 @@ export function normalizeId(text: string): string {
   return text.normalize("NFKC").trim();
 }
 
+/*
+ * 見出しは、まず完全一致で探し、見つからなければ前方一致で探す。
+ *
+ * 見出しに但し書きが付いていることがある（`裁量点最大60`、`教員氏名（リストから
+ * 選択）`、`GPA（4.0満点）`）。完全一致を先に試すのは、`研究室` と `研究室名` の
+ * ように片方が他方の頭に含まれる見出しが並んでいても取り違えないため。
+ */
+
 function findIndex(keys: readonly string[], aliases: readonly string[]): number {
   const wanted = aliases.map(matchable);
-  return keys.findIndex((key) => wanted.includes(matchable(key)));
+  const folded = keys.map(matchable);
+  const exact = folded.findIndex((key) => wanted.includes(key));
+  return exact >= 0
+    ? exact
+    : folded.findIndex((key) => wanted.some((alias) => key.startsWith(alias)));
 }
 
 function pick(row: Record<string, string>, aliases: readonly string[]): string | undefined {
   const wanted = aliases.map(matchable);
-  for (const [key, value] of Object.entries(row)) {
+  const entries = Object.entries(row);
+  for (const [key, value] of entries) {
     if (wanted.includes(matchable(key))) return value;
   }
+  for (const [key, value] of entries) {
+    if (wanted.some((alias) => matchable(key).startsWith(alias))) return value;
+  }
   return undefined;
+}
+
+/** 見当たらなかった列を、その見出しの候補ごと知らせる。 */
+function missingColumn(what: string, aliases: readonly string[]): Error {
+  return new Error(`${what}の列 (${aliases.slice(0, 3).join(" / ")} など) が見つかりません`);
 }
 
 /** `第3希望` から 3 を取り出す。希望の列でなければ null。 */
