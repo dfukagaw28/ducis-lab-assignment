@@ -10,6 +10,7 @@ import { parseCsv } from "../src/io/csv.js";
 import {
   labsCsv,
   outputFileName,
+  preferencesCsv,
   rankingCsv,
   resultWorkbook,
   studentsCsv,
@@ -157,6 +158,48 @@ describe("rankingCsv", () => {
         .filter((row) => row[0] === lab.id && row[at("配属")] === "○")
         .map((row) => row[at("学籍番号")]);
       expect(marked.sort()).toEqual([...lab.students].sort());
+    }
+  });
+});
+
+describe("preferencesCsv", () => {
+  const rows = parseCsv(preferencesCsv(instance, assignment));
+  const header = rows[0]!;
+  const body = rows.slice(1);
+  const at = (name: string) => header.indexOf(name);
+
+  it("学生ごとに、全研究室を 1 行ずつ並べる", () => {
+    expect(header).toEqual(["学籍番号", "氏名", "順位", "研究室", "研究室名", "出所", "配属"]);
+    expect(body).toHaveLength(instance.students.length * instance.labs.length);
+  });
+
+  it("学籍番号の順に並べる", () => {
+    const ids = [...new Set(body.map((row) => row[0]!))];
+    expect(ids).toEqual([...ids].sort());
+  });
+
+  it("本人が書いた分を先に、補完で足した分を後に置く", () => {
+    for (const student of instance.students) {
+      const mine = body.filter((row) => row[0] === student.id);
+      expect(mine.map((row) => row[at("研究室")]).slice(0, student.preferences.length)).toEqual([
+        ...student.preferences,
+      ]);
+      expect(mine.slice(0, student.preferences.length).every((row) => row[at("出所")] === "希望")).toBe(true);
+      expect(mine.slice(student.preferences.length).every((row) => row[at("出所")] === "補完")).toBe(true);
+    }
+  });
+
+  it("希望を出していない学生は全部が補完になる", () => {
+    const absent = instance.students.find((student) => student.preferences.length === 0)!;
+    const mine = body.filter((row) => row[0] === absent.id);
+    expect(mine.every((row) => row[at("出所")] === "補完")).toBe(true);
+  });
+
+  it("配属先に ○ が 1 つだけ付く", () => {
+    for (const student of instance.students) {
+      const marked = body.filter((row) => row[0] === student.id && row[at("配属")] === "○");
+      expect(marked).toHaveLength(1);
+      expect(marked[0]![at("研究室")]).toBe(assignment.studentToLab.get(student.id));
     }
   });
 });

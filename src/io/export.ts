@@ -5,6 +5,7 @@
  */
 
 import type { Report } from "../domain/report.js";
+import { completedPreferences } from "../domain/preferences.js";
 import type { Assignment } from "../domain/solve.js";
 import type { Instance, Params } from "../domain/types.js";
 import { toCsv, type CsvValue } from "./csv.js";
@@ -75,6 +76,50 @@ export function rankingRows(instance: Instance, assignment: Assignment): CsvValu
         round(entry.total),
         entry.lottery,
         placed.has(entry.id) ? "○" : "",
+      ]);
+    });
+  }
+
+  return rows;
+}
+
+export function preferencesCsv(instance: Instance, assignment: Assignment): string {
+  return toCsv(preferenceListRows(instance, assignment));
+}
+
+/**
+ * 学生ごとの、実際に解くのに使った希望順位表。
+ *
+ * 本人が書いた分と、補完で足した分（順位を付けなかった研究室をランダムに並べたもの）
+ * を続けて出し、`出所` で見分けられるようにする。研究室の側の並び（`rankingRows`）と
+ * 突き合わせれば、なぜその配属になったのかを両側から追える。
+ *
+ * 学籍番号の順に並べる。これは「この学生が何を出したか」を引くための表なので、
+ * 研究室ごとにまとめた配属の一覧とは並べ方が違う。
+ */
+export function preferenceListRows(instance: Instance, assignment: Assignment): CsvValue[][] {
+  const labName = new Map(instance.labs.map((lab) => [lab.id, lab.name ?? lab.id]));
+  const rows: CsvValue[][] = [
+    ["学籍番号", "氏名", "順位", "研究室", "研究室名", "出所", "配属"],
+  ];
+
+  const byId = [...instance.students].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const student of byId) {
+    const placed = assignment.studentToLab.get(student.id);
+    const completed = completedPreferences(
+      student.preferences,
+      assignment.preferenceRest.get(student.id)
+    );
+
+    completed.forEach((labId, index) => {
+      rows.push([
+        student.id,
+        student.name ?? "",
+        index + 1,
+        labId,
+        labName.get(labId) ?? "",
+        index < student.preferences.length ? "希望" : "補完",
+        labId === placed ? "○" : "",
       ]);
     });
   }

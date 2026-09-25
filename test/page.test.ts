@@ -35,9 +35,10 @@ describe("page", () => {
     expect(output.textContent).toContain("サンプルデータ（合成、実ファイルではありません）");
     expect(output.querySelectorAll("table").length).toBeGreaterThanOrEqual(3);
     expect(output.textContent).toContain("ブロッキングペアはありません");
-    // Excel 1 つと CSV 4 つ
-    expect(output.querySelectorAll("[data-download]")).toHaveLength(5);
+    // Excel 1 つと CSV 5 つ
+    expect(output.querySelectorAll("[data-download]")).toHaveLength(6);
     expect(output.querySelector('[data-download="ranking"]')).not.toBeNull();
+    expect(output.querySelector('[data-download="preferences"]')).not.toBeNull();
     expect(output.querySelector('[data-download="workbook"]')).not.toBeNull();
 
     const seed = app.querySelector<HTMLInputElement>("#seed")!;

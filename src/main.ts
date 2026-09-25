@@ -16,6 +16,7 @@ import {
   downloadWorkbook,
   labsCsv,
   outputFileName,
+  preferencesCsv,
   rankingCsv,
   resultWorkbook,
   studentsCsv,
@@ -163,7 +164,9 @@ output.addEventListener("click", (event) => {
         ? labsCsv(instance, report)
         : kind === "ranking"
           ? rankingCsv(instance, latest.assignment)
-          : summaryCsv(report, params, latest.seedSource);
+          : kind === "preferences"
+            ? preferencesCsv(instance, latest.assignment)
+            : summaryCsv(report, params, latest.seedSource);
   downloadCsv(outputFileName(kind, params.seed), csv);
 });
 
